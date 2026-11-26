@@ -1475,7 +1475,7 @@ function mpOnErr(kind){ if(MP.conn&&kind!=='load')return; $('lbStatus').textCont
 function mpOnJoin(pid){ if(MP.peer!==null&&pid!==MP.peer)return; MP.peer=pid; MP.conn=true; clearTimeout(MP.connT); mpSend({t:'hello',role:MP.host?'host':'guest',mode:MP.mode,v:MP_VER}); if(MP.host)mpSend({t:'cfg',mode:MP.mode,cfg:MP.cfg}); mpLobbyRender(); }
 function mpOnLeave(pid){ if(pid!==MP.peer)return; MP.conn=false; MP.peer=null; MP.hello=false;
   if(MP.on){ if(HZ()){ mpEndMatch(null,'對方已離線'); } else { mpDropToSolo(); } } else { $('lbStatus').textContent=MP.host?'對方已離開，等待另一位玩家加入…':'房主已離開房間。'; mpLobbyRender(); } }
-function mpLeave(silent){ clearTimeout(MP.connT); if(MP.tr){ MP.leaving=true; try{ MP.tr.leave(); }catch(e){} } MP.tr=null; MP.conn=false; MP.peer=null; MP.hello=false; MP.on=false; MP.zomb=false; RP.has=false; }
+function mpLeave(silent){ clearTimeout(MP.connT); if(MP.tr){ MP.leaving=true; try{ MP.tr.leave(); }catch(e){} } MP.tr=null; MP.conn=false; MP.peer=null; MP.hello=false; MP.on=false; MP.zomb=false; RP.has=false; RP.buf=null; MP.off=undefined; }
 $('lbLeave').addEventListener('click',()=>{ mpLeave(); showMenu('main','廠區 3F 射擊場',MAIN_DESC); });
 function mpLobbyRender(){ const hz=MP.mode==='horror', c=MP.cfg; $('lbDef').hidden=hz; $('lbHz').hidden=!hz;
   $('lbPlayers').innerHTML='<div class="pl"><b>P1</b>'+(MP.host?'你（房主）':'房主')+'</div><div class="pl'+(MP.conn?'':' off')+'"><b>P2</b>'+(MP.conn?(MP.host?'已加入':'你'):'等待中…')+'</div>';
@@ -1523,14 +1523,25 @@ function mpSnd(k,x,y,z){ if(MP.on)mpSend({t:'snd',k,x:+x.toFixed(2),y:+y.toFixed
 function mpPlaySnd(d){ if(d.k==='gun'){ if(HZ())hVoice('gun',d.x,d.y,d.z,'human'); else sfx('shot',distVol(d.x,d.z)*0.7); } else if(d.k==='step'){ if(HZ())hVoice('step',d.x,0.1,d.z,'human'); } else { if(d.k==='clank'||d.k==='fixalert')for(const m of machines)if(Math.abs(m.lampX-d.x)<0.05&&Math.abs(m.lampZ-d.z)<0.05)m.fixT=0.8; hVoice(d.k,d.x,d.y,d.z,'machine'); } }
 
 /* ---- player state both ways ---- */
-function mpPs(){ const o={t:'ps',x:+P.x.toFixed(3),y:+P.y.toFixed(3),z:+P.z.toFixed(3),yw:+P.yaw.toFixed(3),pt:+P.pitch.toFixed(3),cr:P.crouch?1:0,mv:P.moving,wk:+P.walk.toFixed(2),al:P.alive?1:0,dn:P.down?1:0,dd:P.dead?1:0,dt:Math.ceil(P.downT||0),
+/* ---- snapshot interpolation: show the other side ~90 ms in the past, between two received samples ---- */
+const MP_DELAY=90, MP_XMAX=120, MPS={};
+function mpNow(){ return performance.now(); }
+function mpClk(ts){ if(typeof ts!=='number')return; const o=mpNow()-ts; if(MP.off===undefined||o<MP.off)MP.off=o; else MP.off+=(o-MP.off)*0.004; }
+function bufPush(e,ts,x,y,z,yaw){ const B=e.buf||(e.buf=[]); const L=B[B.length-1]; if(L&&ts<=L.t)return; B.push({t:ts,x,y,z,yaw}); if(B.length>16)B.shift(); }
+function bufSample(e,out){ const B=e.buf; if(!B||!B.length||MP.off===undefined)return false; const rt=mpNow()-MP.off-MP_DELAY;
+  while(B.length>2&&B[1].t<=rt)B.shift();
+  const a=B[0]; if(B.length===1||rt<=a.t){ out.x=a.x; out.y=a.y; out.z=a.z; out.yaw=a.yaw; return true; }
+  const b=B[1]; let f=(rt-a.t)/(b.t-a.t); if(Math.hypot(b.x-a.x,b.z-a.z)>6){ const s=f<1?a:b; out.x=s.x; out.y=s.y; out.z=s.z; out.yaw=s.yaw; return true; }
+  if(f>1)f=1+Math.min(rt-b.t,MP_XMAX)/(b.t-a.t);
+  out.x=a.x+(b.x-a.x)*f; out.y=a.y+(b.y-a.y)*f; out.z=a.z+(b.z-a.z)*f; let da=b.yaw-a.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; out.yaw=a.yaw+da*Math.min(f,1); return true; }
+function mpPs(){ const o={t:'ps',ts:Math.round(mpNow()),x:+P.x.toFixed(3),y:+P.y.toFixed(3),z:+P.z.toFixed(3),yw:+P.yaw.toFixed(3),pt:+P.pitch.toFixed(3),cr:P.crouch?1:0,mv:P.moving,wk:+P.walk.toFixed(2),al:P.alive?1:0,dn:P.down?1:0,dd:P.dead?1:0,dt:Math.ceil(P.downT||0),
     h:+pHeight().toFixed(2),sc:S.bless.scale,g:curGun().id,ft:P.flashT>0?1:0,hp:Math.ceil(P.hp)};
   if(HZ()){ if(MP.zomb){ o.ch=Z.sees&&!Z.bio?1:0; o.atk=+Z.atk.toFixed(2); o.gi=Z.bio?1:0; o.fg=Z.fogT>0?1:0; } else o.fl=+FL.val.toFixed(2); }
   mpSend(o); }
-function mpOnPs(d){ const first=!RP.has; RP.has=true; RP.tx=d.x; RP.ty=d.y; RP.tz=d.z; RP.tyaw=d.yw; RP.pitch=d.pt; RP.crouch=!!d.cr; RP.mv=d.mv; RP.walk=d.wk; RP.alive=!!d.al; RP.down=!!d.dn; RP.dead=!!d.dd; RP.downT=d.dt||0;
+function mpOnPs(d){ const first=!RP.has; RP.has=true; mpClk(d.ts); bufPush(RP,typeof d.ts==='number'?d.ts:mpNow(),d.x,d.y,d.z,d.yw); RP.tx=d.x; RP.ty=d.y; RP.tz=d.z; RP.tyaw=d.yw; RP.pitch=d.pt; RP.crouch=!!d.cr; RP.mv=d.mv; RP.walk=d.wk; RP.alive=!!d.al; RP.down=!!d.dn; RP.dead=!!d.dd; RP.downT=d.dt||0;
   RP.h=d.h; RP.sc=d.sc; RP.gun=d.g; if(d.ft)RP.ft=0.06; RP.hp=d.hp; RP.fl=d.fl||0; RP.chase=!!d.ch; RP.giant=!!d.gi; RP.fog=!!d.fg; if(d.atk>0&&RP.atk<=0)RP.atk=d.atk;
   if(first){ RP.x=d.x; RP.y=d.y; RP.z=d.z; RP.yaw=d.yw; } }
-function mpInterpRP(dt){ if(!RP.has)return; const k=Math.min(1,dt*14); if(Math.hypot(RP.tx-RP.x,RP.tz-RP.z)>6){ RP.x=RP.tx; RP.z=RP.tz; } RP.x+=(RP.tx-RP.x)*k; RP.y+=(RP.ty-RP.y)*k; RP.z+=(RP.tz-RP.z)*k;
+function mpInterpRP(dt){ if(!RP.has)return; if(bufSample(RP,MPS)){ RP.x=MPS.x; RP.y=MPS.y; RP.z=MPS.z; RP.yaw=MPS.yaw; RP.ft-=dt; return; } const k=Math.min(1,dt*14); if(Math.hypot(RP.tx-RP.x,RP.tz-RP.z)>6){ RP.x=RP.tx; RP.z=RP.tz; } RP.x+=(RP.tx-RP.x)*k; RP.y+=(RP.ty-RP.y)*k; RP.z+=(RP.tz-RP.z)*k;
   let da=RP.tyaw-RP.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; RP.yaw+=da*k; RP.ft-=dt; }
 
 /* ---- remote human avatar ---- */
@@ -1561,8 +1572,8 @@ function mpRemoteBoom(x,y,z,r,max,full,ent,by){ if(!MP.on||!MP.host||!RP.has||!R
 
 /* ---- per-frame ---- */
 function mpUpdate(dt){ mpInterpRP(dt);
-  MP.psT-=dt; if(MP.psT<=0){ MP.psT=0.05; mpPs(); }
-  if(MP.host){ flowRT-=dt; if(flowRT<=0&&RP.has){ flowRT=0.4; flowR(RP.x,RP.z); } MP.snapT-=dt; if(MP.snapT<=0){ MP.snapT=1/15; if(HZ())mpSnapHz(); else mpSnapDef(); } }
+  MP.psT-=dt; if(MP.psT<=0){ MP.psT=1/30; mpPs(); }
+  if(MP.host){ flowRT-=dt; if(flowRT<=0&&RP.has){ flowRT=0.4; flowR(RP.x,RP.z); } MP.snapT-=dt; if(MP.snapT<=0){ MP.snapT=1/20; if(HZ())mpSnapHz(); else mpSnapDef(); } }
   if(HZ())mpHzUpdate(dt); else mpDefUpdate(dt); }
 function mpHud(){ const el=$('mpHud'); if(!MP.on){ el.hidden=true; return; } el.hidden=false; let h='';
   if(!HZ()){ const tag=MP.host?'P2':'P1'; h='<b>'+tag+'</b> '+(!RP.has?'連線中':RP.dead?'陣亡（下一波復活）':RP.down?'<span class="bad">倒地 '+RP.downT+' 秒</span>':'生命 '+RP.hp);
@@ -1609,20 +1620,21 @@ function mpWaveIn(d){ S.wave=d.w; S.phase=d.ph; S.timer=d.tm; S.queue=d.q; S.cre
 function mpApplyPresent(s){ if(!s)return; machines.forEach((m,i)=>{ const on=s[i]==='1'; m.hp=200; if(m.exploded)return; if(m.present!==on){ m.present=on; showEnt(m,on); } m.alive=on; }); navDirty=true; if(H.on)syncLamps(); }
 function mpSnapDef(){ const E=[]; for(const e of enemies){ if(!e.nid)e.nid=MP.nid++; E.push([e.nid,e.type,+e.x.toFixed(2),+e.z.toFixed(2),+e.yaw.toFixed(2),Math.max(0,Math.round(e.hp)),e.max,e.dead?1:0,(e.state==='combat'?1:0)|(e.blind>0?2:0)|(e.fuse>=0?4:0)]); }
   const T=throws.map(t=>[+t.x.toFixed(2),+t.y.toFixed(2),+t.z.toFixed(2),t.type==='flash'?1:0,t.owner==='boss'?1:0]);
-  mpSend({t:'snap',e:E,th:T,ph:S.phase,tm:+S.timer.toFixed(1),w:S.wave,q:S.queue,cr:S.creeper?1:0,dw:mpDoorsStr(),agv:agv?[+agv.x.toFixed(2),+agv.z.toFixed(2),+agv.mesh.rotation.y.toFixed(2),agv.broken?1:0,agv.cargo.slice()]:null}); }
+  mpSend({t:'snap',ts:Math.round(mpNow()),e:E,th:T,ph:S.phase,tm:+S.timer.toFixed(1),w:S.wave,q:S.queue,cr:S.creeper?1:0,dw:mpDoorsStr(),agv:agv?[+agv.x.toFixed(2),+agv.z.toFixed(2),+agv.mesh.rotation.y.toFixed(2),agv.broken?1:0,agv.cargo.slice()]:null}); }
 let MPTH=[];
-function mpSnapDefIn(d){ const seen=new Set();
+function mpSnapDefIn(d){ const seen=new Set(); mpClk(d.ts); const ts=typeof d.ts==='number'?d.ts:mpNow();
   for(const a of d.e){ seen.add(a[0]); let e=mpFindN(a[0]); if(!e){ const c=nearestFree(cellOf(a[2],a[3])); e=makeEnemy(a[1],c<0?0:c); e.nid=a[0]; e.rep=true; e.x=a[2]; e.z=a[3]; e.yaw=a[4]; }
-    e.nx=a[2]; e.nz=a[3]; e.nyaw=a[4]; e.hp=a[5]; e.max=a[6]; if(a[7]&&!e.dead){ e.dead=0.6; sfx('kill'); } e.state=a[8]&1?'combat':'patrol'; e.blind=a[8]&2?1:0; e.fuse=a[8]&4?1:-1; }
+    e.nx=a[2]; e.nz=a[3]; e.nyaw=a[4]; bufPush(e,ts,a[2],0,a[3],a[4]); e.hp=a[5]; e.max=a[6]; if(a[7]&&!e.dead){ e.dead=0.6; sfx('kill'); } e.state=a[8]&1?'combat':'patrol'; e.blind=a[8]&2?1:0; e.fuse=a[8]&4?1:-1; }
   for(const e of enemies)if(e.rep&&!seen.has(e.nid)){ if(e.dead)e.gone=true; else { scene.remove(e.g); e.removed=true; } } for(let i=enemies.length-1;i>=0;i--)if(enemies[i].removed)enemies.splice(i,1);
   while(MPTH.length<d.th.length){ const m=new THREE.Mesh(sphG,mat(0x4a5a2a)); m.scale.setScalar(0.07); scene.add(m); MPTH.push(m); } MPTH.forEach((m,i)=>{ const a=d.th[i]; m.visible=!!a; if(a)m.position.set(a[0],a[1],a[2]); });
   const prev=S.phase; S.phase=d.ph; S.timer=d.tm; S.wave=d.w; S.queue=d.q; S.creeper=!!d.cr; if(prev==='buy'&&S.phase==='fight'){ closeShop(); say('第 '+S.wave+' 波　敵人進廠',2.2); }
-  mpApplyDoors(d.dw); if(d.agv&&agv){ agv.x=d.agv[0]; agv.z=d.agv[1]; agv.mesh.position.set(agv.x,0,agv.z); agv.mesh.rotation.y=d.agv[2]; agv.dynO.x=agv.x; agv.dynO.z=agv.z; agv.cargo=d.agv[4]; if(d.agv[3]&&!agv.broken)mpEntGone({k:'a'}); } }
+  mpApplyDoors(d.dw); if(d.agv&&agv){ const fresh=!agv.buf; bufPush(agv,ts,d.agv[0],0,d.agv[1],d.agv[2]); if(fresh){ agv.x=d.agv[0]; agv.z=d.agv[1]; agv.mesh.position.set(agv.x,0,agv.z); agv.mesh.rotation.y=d.agv[2]; agv.dynO.x=agv.x; agv.dynO.z=agv.z; } agv.cargo=d.agv[4]; if(d.agv[3]&&!agv.broken)mpEntGone({k:'a'}); } }
 function mpRepEn(dt){ for(let i=enemies.length-1;i>=0;i--){ const e=enemies[i]; if(!e.rep)continue;
     if(e.dead){ e.dead-=dt; e.g.rotation.x=-(0.6-Math.max(e.dead,0))/0.6*1.5; e.g.position.y=0.1; if(e.dead<=-1.0||(e.gone&&e.dead<=0)){ scene.remove(e.g); enemies.splice(i,1); } continue; }
-    const ox=e.x, oz=e.z, k=Math.min(1,dt*12); if(Math.hypot(e.nx-e.x,e.nz-e.z)>5){ e.x=e.nx; e.z=e.nz; } e.x+=(e.nx-e.x)*k; e.z+=(e.nz-e.z)*k; let da=e.nyaw-e.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; e.yaw+=da*k;
+    const ox=e.x, oz=e.z; if(bufSample(e,MPS)){ e.x=MPS.x; e.z=MPS.z; e.yaw=MPS.yaw; } else { const k=Math.min(1,dt*12); if(Math.hypot(e.nx-e.x,e.nz-e.z)>5){ e.x=e.nx; e.z=e.nz; } e.x+=(e.nx-e.x)*k; e.z+=(e.nz-e.z)*k; let da=e.nyaw-e.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; e.yaw+=da*k; }
     const sp=Math.hypot(e.x-ox,e.z-oz)/Math.max(dt,1e-3); e.ph+=dt*sp*2.2; if(e.type==='creeper')e.g.scale.setScalar(e.sc*(e.fuse>=0?1+0.15*Math.sin(S.gameTime*30):1));
-    e.g.position.set(e.x,0,e.z); e.g.rotation.y=e.yaw; const sw=Math.sin(e.ph)*0.6*(sp>0.2?1:0); e.l1.rotation.x=sw; e.l2.rotation.x=-sw; if(e.a1)e.a1.rotation.x=-sw; } }
+    e.g.position.set(e.x,0,e.z); e.g.rotation.y=e.yaw; const sw=Math.sin(e.ph)*0.6*(sp>0.2?1:0); e.l1.rotation.x=sw; e.l2.rotation.x=-sw; if(e.a1)e.a1.rotation.x=-sw; }
+  if(agv&&agv.buf&&!agv.broken&&bufSample(agv,MPS)){ agv.x=MPS.x; agv.z=MPS.z; agv.mesh.position.set(agv.x,0,agv.z); agv.mesh.rotation.y=MPS.yaw; agv.dynO.x=agv.x; agv.dynO.z=agv.z; } }
 function mpDefUpdate(dt){ if(!AV&&RP.has){ AV=mkAvatar(MP.host?'P2':'P1',MP.host?0xf08a1c:0x5b8fd6); } avUpdate(dt);
   if(P.down){ P.downT-=dt; P.crouch=true; if(P.downT<=0){ P.down=false; P.dead=true; say('陣亡，下一波購買時間開始時復活',3); } }
   const near=RP.has&&RP.down&&P.alive&&Math.hypot(RP.x-P.x,RP.z-P.z)<1.6; if(near&&keys.KeyE&&!uiOpen){ MP.revT+=dt; if(MP.revT>=3){ MP.revT=0; mpSend({t:'revive'}); note('已救起隊友',2); } } else MP.revT=0;
@@ -1687,7 +1699,7 @@ function zFog(){ if(!Z.has.fog){ note('還沒學會瘴氣',1.5); return; } if(Z.
 function zMark(x,z){ if(!MP.zomb)return; MP.marks.push({x,z,t:2}); if(MP.marks.length>8)MP.marks.shift(); }
 function mpZHear(x,z,rad){ if(!MP.on||!HZ())return; if(MP.zomb){ if(Math.hypot(P.x-x,P.z-z)<=rad)zMark(x,z); } else if(MP.host&&RP.has&&Math.hypot(RP.x-x,RP.z-z)<=rad)mpSend({t:'heard',x:+x.toFixed(2),z:+z.toFixed(2)}); }
 function zMarksDraw(){ const box_=$('zMarks'); if(!MP.zomb){ if(box_.childElementCount)box_.innerHTML=''; return; } while(box_.childElementCount<MP.marks.length){ const d=document.createElement('div'); d.className='zmk'; box_.appendChild(d); }
-  const kids=box_.children; for(let i=0;i<kids.length;i++){ const el=kids[i], m=MP.marks[i]; if(!m){ el.style.display='none'; continue; } const a=Math.atan2(m.x-P.x,m.z-P.z)-Math.atan2(-Math.sin(P.yaw),-Math.cos(P.yaw)); const r=130;
+  const kids=box_.children; for(let i=0;i<kids.length;i++){ const el=kids[i], m=MP.marks[i]; if(!m){ el.style.display='none'; continue; } const a=Math.atan2(-Math.sin(P.yaw),-Math.cos(P.yaw))-Math.atan2(m.x-P.x,m.z-P.z); const r=130;
     el.style.display='block'; el.style.transform='translate(-50%,-50%) translate('+(Math.sin(a)*r).toFixed(1)+'px,'+(-Math.cos(a)*r).toFixed(1)+'px) rotate('+a.toFixed(2)+'rad)'; el.style.opacity=clamp(m.t/2,0,1).toFixed(2); } }
 /* fog cloud around the zombie (seen by the human) */
 function mkFogCloud(){ if(MP.fogG)return MP.fogG; const g=new THREE.Group(); const m=new THREE.SpriteMaterial({map:glowTex,color:0x050507,transparent:true,opacity:0.95,depthWrite:false}); m.userData.keepGlow=true;
@@ -1709,15 +1721,15 @@ function mpMonHit(e,d,o){ o=o||{}; e.twitch=0.2; if(e.zp)mpSend({t:'zhit',d,fx:o
 function mpMonFxApply(e,fx){ if(!fx)return; if(fx.slow)e.slowT=Math.max(e.slowT||0,fx.slow); if(fx.stun){ e.stunT=Math.max(e.stunT||0,fx.stun); e.atk=0; } if(fx.freeze)e.freezeT=Math.max(e.freezeT||0,fx.freeze); if(fx.burn)e.burnT=Math.max(e.burnT||0,fx.burn); }
 /* NPC snapshot */
 function mpSnapHz(){ const E=[]; for(const e of enemies){ if(e.zp||!e.horror)continue; if(!e.nid)e.nid=MP.nid++; E.push([e.nid,e.type,+e.x.toFixed(2),+e.z.toFixed(2),+e.yaw.toFixed(2),Math.max(0,Math.round(e.hp)),e.max,e.dead>0?1:0,(e.state==='chase'?1:0)|(e.stunT>0?2:0),+(e.atk||0).toFixed(2)]); }
-  mpSend({t:'snap',e:E,dw:mpDoorsStr(),rt:+MP.rTime.toFixed(1),rs:MP.rState,sc:MP.score,rd:MP.round}); }
-function mpSnapHzIn(d){ const seen=new Set(); MP.rTime=d.rt; MP.rState=d.rs; MP.score=d.sc; MP.round=d.rd; mpApplyDoors(d.dw);
+  mpSend({t:'snap',ts:Math.round(mpNow()),e:E,dw:mpDoorsStr(),rt:+MP.rTime.toFixed(1),rs:MP.rState,sc:MP.score,rd:MP.round}); }
+function mpSnapHzIn(d){ const seen=new Set(); mpClk(d.ts); const ts=typeof d.ts==='number'?d.ts:mpNow(); MP.rTime=d.rt; MP.rState=d.rs; MP.score=d.sc; MP.round=d.rd; mpApplyDoors(d.dw);
   for(const a of d.e){ seen.add(a[0]); let e=mpFindN(a[0]); if(!e){ if(a[7])continue; const c=nearestFree(cellOf(a[2],a[3])); e=makeMonster(a[1],c<0?0:c,Math.max(1,S.level)); e.nid=a[0]; e.rep=true; e.x=a[2]; e.z=a[3]; e.yaw=a[4]; e.chase=false; }
-    e.nx=a[2]; e.nz=a[3]; e.nyaw=a[4]; e.hp=a[5]; e.max=a[6]; const ch=!!(a[8]&1); if(ch&&!e.chase&&(e.scrT||0)<=0){ hVoice('scream',e.x,e.headY,e.z,e.type); e.scrT=6; } e.chase=ch; e.stunned=!!(a[8]&2);
+    e.nx=a[2]; e.nz=a[3]; e.nyaw=a[4]; bufPush(e,ts,a[2],0,a[3],a[4]); e.hp=a[5]; e.max=a[6]; const ch=!!(a[8]&1); if(ch&&!e.chase&&(e.scrT||0)<=0){ hVoice('scream',e.x,e.headY,e.z,e.type); e.scrT=6; } e.chase=ch; e.stunned=!!(a[8]&2);
     if(a[9]>0&&(e.atk||0)<=0)e.atk=a[9]; if(a[7]&&e.dead<=0){ e.dead=1.2; e.hp=0; hVoice('die',e.x,e.headY,e.z,e.type); if(e.xr)for(const m of e.xr)m.visible=false; if(!MP.zomb){ S.kills++; if(R()<0.06)dropPower(e.x,e.z); } } }
   for(const e of enemies)if(e.rep&&!seen.has(e.nid)){ if(e.dead>0)e.gone=true; else e.removed=true; } for(let i=enemies.length-1;i>=0;i--)if(enemies[i].removed){ scene.remove(enemies[i].g); enemies.splice(i,1); } }
 function mpRepMon(dt){ for(let i=enemies.length-1;i>=0;i--){ const e=enemies[i]; if(e.zp){ mpZpAnim(e,dt); if(e.dead===-99)enemies.splice(i,1); continue; } if(!e.rep)continue;
     if(e.dead>0||e.gone){ e.dead-=dt; animDeath(e); if(e.dead<=-3){ scene.remove(e.g); enemies.splice(i,1); } continue; }
-    const ox=e.x, oz=e.z, k=Math.min(1,dt*12); if(Math.hypot(e.nx-e.x,e.nz-e.z)>5){ e.x=e.nx; e.z=e.nz; } e.x+=(e.nx-e.x)*k; e.z+=(e.nz-e.z)*k; let da=e.nyaw-e.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; e.yaw+=da*k;
+    const ox=e.x, oz=e.z; if(bufSample(e,MPS)){ e.x=MPS.x; e.z=MPS.z; e.yaw=MPS.yaw; } else { const k=Math.min(1,dt*12); if(Math.hypot(e.nx-e.x,e.nz-e.z)>5){ e.x=e.nx; e.z=e.nz; } e.x+=(e.nx-e.x)*k; e.z+=(e.nz-e.z)*k; let da=e.nyaw-e.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; e.yaw+=da*k; }
     const moving=Math.hypot(e.x-ox,e.z-oz)>dt*0.25; if(e.atk>0){ const prev=e.atk; e.atk-=dt; if(prev>0.15&&e.atk<=0.15)hVoice('swipe',e.x,e.headY,e.z,e.type); if(e.atk<0)e.atk=0; } e.scrT=(e.scrT||0)-dt;
     animMonster(e,dt,moving&&!e.stunned,e.chase); e.g.position.set(e.x,0,e.z); e.g.rotation.y=e.yaw; const d=Math.hypot(e.x-P.x,e.z-P.z);
     e.voiceT-=dt; if(e.voiceT<=0){ if(d<26)hVoice(e.chase?'growl':'breath',e.x,e.headY,e.z,e.type); e.voiceT=e.chase?1.6+R()*1.8:3+R()*4.5; }
@@ -1781,7 +1793,7 @@ function zHud(){ const X=Z; let h='<div class="row"><span class="lbl">生命</sp
   zMarksDraw(); }
 function mpCleanup(){ if(AV){ scene.remove(AV.g); AV=null; } if(MP.fogG)MP.fogG.visible=false; if(MP.claws)MP.claws.visible=false; for(const m of MPTH)m.visible=false; mpFlashRestore(); $('glare').style.opacity='0';
   const g=$('game'); g.classList.remove('nv','zomb','zfog'); $('mpHud').hidden=true; $('zHud').hidden=true; $('zMarks').innerHTML=''; MP.marks.length=0; hemi.color.setHex(0xffffff); hemi.groundColor.setHex(0x9aa4ad); }
-function mpZombieLook(){ hemi.intensity=0.3; hemi.color.setHex(0x9fd69f); hemi.groundColor.setHex(0x1a261a); if(scene.fog){ scene.fog.density=0.085; scene.fog.color.setHex(0x030603); } $('game').classList.add('nv','zomb'); $('zHud').hidden=false; zClaws(); }
+function mpZombieLook(){ hemi.intensity=0.42; hemi.color.setHex(0x9fd69f); hemi.groundColor.setHex(0x1a261a); if(scene.fog){ scene.fog.density=0.0934; scene.fog.color.setHex(0x030603); } $('game').classList.add('nv','zomb'); $('zHud').hidden=false; zClaws(); }
 
 function mpHzBegin(){ zReset(); MP.rState='none'; if(MP.zomb){ mpZombieLook(); FL.val=0; } else $('zHud').hidden=true;
   if(MP.host){ mpSend({t:'lamps',c:machines.map(m=>m.lampC).join('')}); mpRoundStart(1); } }
