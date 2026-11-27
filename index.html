@@ -957,7 +957,7 @@ function dropHorrorItem(x,y,z,type){ const M=itemMats(), g=new THREE.Group(); g.
 function placeHorrorItems(){ for(const p of pickups)if(p.wave&&!p.dead)removePickup(p);
   const spots=[]; for(const m of machines)if(m.present&&m.burn<0&&!m.exploded)spots.push({x:m.sx,y:m.top,z:m.sz,m}); for(const r of racks)if(r.labeled)spots.push({x:r.x,y:0.72,z:r.z,m:null}); shuffle(spots);
   ['battery','battery','battery','battery','med','med'].forEach((k,i)=>{ const s=spots[i]; if(s)dropHorrorItem(s.x,s.y,s.z,k).mach=s.m; }); }
-function updGlints(dt){ const d0=aimDir(), gk=1+0.1*(S.hx?S.hx.rangeKits:0), gc=Math.cos(0.3*gk), gr=21*gk; for(const p of pickups){ if(p.dead||!p.glint)continue; const dx=p.x-camX, dy=p.y+0.12-camY, dz=p.z-camZ, d=Math.hypot(dx,dy,dz); let a=0;
+function updGlints(dt){ const d0=aimDir(), fg=flashGeom(S.hx?S.hx.rangeKits:0), gc=Math.cos(Math.min(1.2,fg.ang*1.2)), gr=21*fg.kd; for(const p of pickups){ if(p.dead||!p.glint)continue; const dx=p.x-camX, dy=p.y+0.12-camY, dz=p.z-camZ, d=Math.hypot(dx,dy,dz); let a=0;
     if(FL.val>0.05&&d<gr&&d>0.3){ const c=(dx*d0[0]+dy*d0[1]+dz*d0[2])/d; if(c>gc){ p.visT-=dt; if(p.visT<=0){ p.visT=0.25; p.vis=losClear(camX,camY,camZ,p.x,p.y+0.12,p.z,null); } if(p.vis)a=FL.val*clamp((c-gc)/(1-gc),0,1)*(1-d/(gr+1))*(0.75+0.25*Math.sin(S.gameTime*9+p.x*3)); } }
     p.glint.material.opacity=a; p.glint.visible=a>0.01; } }
 
@@ -1245,8 +1245,10 @@ const H2={drone:null,agv:null,traps:[],beacons:[],powers:[],bpFrom:null,itemHold
 function hxNew(){ return {dmgParts:0,magParts:0,rangeKits:0,battKits:0,chip:0,mod:null,perks:{},bp:{drone:0,agv:0,trap:0,beacon:0},built:{},cprog:{drone:0,agv:0,trap:0,beacon:0},craft:null,charges:{trap:0,beacon:0},sel:null,insta:0,op:null,lastAnn:false}; }
 function hpMult(n){ return n<10?1+0.1*(n-1):1.8*Math.pow(1.1,n-9); }
 function hxPostSpd(e){ return e.type==='normal'?2.52:e.type==='crawler'?3.1:Math.min(e.speed,2.5); }
-function hxApplyFlash(){ if(!HL.flash)return; const k=1+0.1*((S.hx&&S.hx.rangeKits)||0); HL.flash.distance=22*k; HL.flash.angle=0.25*k; HL.spill.distance=11*k; HL.spill.angle=Math.min(1.2,0.7*k);
-  const sc=HL.flash.shadow&&HL.flash.shadow.camera; if(sc){ sc.far=22*k; if(sc.updateProjectionMatrix)sc.updateProjectionMatrix(); } }
+// beam: 1.5x the old cone (half-angle 0.375 rad), each range kit +20% cone and +10% reach (max 5 kits)
+function flashGeom(rk){ const kd=1+0.1*rk, a=0.375*(1+0.2*rk); return {dist:22*kd,ang:a,sDist:11*kd,sAng:Math.min(1.2,Math.max(0.7*kd,a*1.6)),kd}; }
+function hxApplyFlash(){ if(!HL.flash)return; const f=flashGeom((S.hx&&S.hx.rangeKits)||0); HL.flash.distance=f.dist; HL.flash.angle=f.ang; HL.spill.distance=f.sDist; HL.spill.angle=f.sAng;
+  const sc=HL.flash.shadow&&HL.flash.shadow.camera; if(sc){ sc.far=f.dist; if(sc.updateProjectionMatrix)sc.updateProjectionMatrix(); } }
 
 /* ---- reward rolls ---- */
 function hxPending(type,sub){ let c=0; for(const p of pickups)if(!p.dead&&p.hx&&p.type===type&&(sub===undefined||p.sub===sub))c++; return c; }
@@ -1283,7 +1285,7 @@ function giveHorror(p){ const X=S.hx, t=p.type, s=p.sub;
   if(t==='battery'){ if(P.battery>=P.battMax)return false; P.battery=Math.min(P.battMax,P.battery+30); return '取得 '+HXN.battery+'，電量 '+Math.ceil(P.battery)+' / '+P.battMax; }
   if(t==='med'){ if(P.hp>=P.hpMax)return false; P.hp=Math.min(P.hpMax,P.hp+40); return '取得 '+HXN.med; }
   if(t==='part'){ if(s==='dmg'){ if(X.dmgParts>=10)return false; X.dmgParts++; return '傷害配件：單發傷害 '+Math.round(gunDmg('HG')); } if(X.magParts>=8)return false; X.magParts++; return '彈匣配件：彈匣 '+magCap('HG')+' 發（換彈後生效）'; }
-  if(t==='kit'){ if(s==='range'){ if(X.rangeKits>=5)return false; X.rangeKits++; hxApplyFlash(); return '範圍擴充：照射範圍 +'+X.rangeKits*10+'%'; }
+  if(t==='kit'){ if(s==='range'){ if(X.rangeKits>=5)return false; X.rangeKits++; hxApplyFlash(); return '範圍擴充：光圈 +'+X.rangeKits*20+'%、照射距離 +'+X.rangeKits*10+'%'; }
     if(X.battKits>=5)return false; X.battKits++; P.battMax=100+10*X.battKits; P.battery=Math.min(P.battMax,P.battery+10); return '電池擴充：電量上限 '+P.battMax; }
   if(t==='bp'){ const o=BPK.filter(k=>!X.built[k]&&X.bp[k]<BPNEED[k]); if(!o.length)return '藍圖已全部集滿'; const k=pick(o); X.bp[k]++; const done=X.bp[k]>=BPNEED[k];
     return BPN[k]+'藍圖 '+X.bp[k]+'/'+BPNEED[k]+(done?'，已集滿，'+(S.touch?'到暫停選單的藍圖製作':'按 B 製作'):''); }
@@ -1575,10 +1577,10 @@ function bufSample(e,out){ const B=e.buf; if(!B||!B.length||MP.off===undefined)r
   out.x=a.x+(b.x-a.x)*f; out.y=a.y+(b.y-a.y)*f; out.z=a.z+(b.z-a.z)*f; let da=b.yaw-a.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; out.yaw=a.yaw+da*Math.min(f,1); return true; }
 function mpPs(){ const o={t:'ps',ts:Math.round(mpNow()),x:+P.x.toFixed(3),y:+P.y.toFixed(3),z:+P.z.toFixed(3),yw:+P.yaw.toFixed(3),pt:+P.pitch.toFixed(3),cr:P.crouch?1:0,mv:P.moving,wk:+P.walk.toFixed(2),al:P.alive?1:0,dn:P.down?1:0,dd:P.dead?1:0,dt:Math.ceil(P.downT||0),
     h:+pHeight().toFixed(2),sc:S.bless.scale,g:curGun().id,ft:P.flashT>0?1:0,hp:Math.ceil(P.hp)};
-  if(HZ()){ if(MP.zomb){ o.ch=Z.sees&&!Z.bio?1:0; o.atk=+Z.atk.toFixed(2); o.gi=Z.bio?1:0; o.fg=Z.fogT>0?1:0; } else o.fl=+FL.val.toFixed(2); }
+  if(HZ()){ if(MP.zomb){ o.ch=Z.sees&&!Z.bio?1:0; o.atk=+Z.atk.toFixed(2); o.gi=Z.bio?1:0; o.fg=Z.fogT>0?1:0; } else { o.fl=+FL.val.toFixed(2); o.rk=(S.hx&&S.hx.rangeKits)||0; } }
   mpSend(o); }
 function mpOnPs(d){ const first=!RP.has; RP.has=true; mpClk(d.ts); bufPush(RP,typeof d.ts==='number'?d.ts:mpNow(),d.x,d.y,d.z,d.yw); RP.tx=d.x; RP.ty=d.y; RP.tz=d.z; RP.tyaw=d.yw; RP.pitch=d.pt; RP.crouch=!!d.cr; RP.mv=d.mv; RP.walk=d.wk; RP.alive=!!d.al; RP.down=!!d.dn; RP.dead=!!d.dd; RP.downT=d.dt||0;
-  RP.h=d.h; RP.sc=d.sc; RP.gun=d.g; if(d.ft)RP.ft=0.06; RP.hp=d.hp; RP.fl=d.fl||0; RP.chase=!!d.ch; RP.giant=!!d.gi; RP.fog=!!d.fg; if(d.atk>0&&RP.atk<=0)RP.atk=d.atk;
+  RP.h=d.h; RP.sc=d.sc; RP.gun=d.g; if(d.ft)RP.ft=0.06; RP.hp=d.hp; RP.fl=d.fl||0; RP.rk=d.rk||0; RP.chase=!!d.ch; RP.giant=!!d.gi; RP.fog=!!d.fg; if(d.atk>0&&RP.atk<=0)RP.atk=d.atk;
   if(first){ RP.x=d.x; RP.y=d.y; RP.z=d.z; RP.yaw=d.yw; } }
 function mpInterpRP(dt){ if(!RP.has)return; if(bufSample(RP,MPS)){ RP.x=MPS.x; RP.y=MPS.y; RP.z=MPS.z; RP.yaw=MPS.yaw; RP.ft-=dt; return; } const k=Math.min(1,dt*14); if(Math.hypot(RP.tx-RP.x,RP.tz-RP.z)>6){ RP.x=RP.tx; RP.z=RP.tz; } RP.x+=(RP.tx-RP.x)*k; RP.y+=(RP.ty-RP.y)*k; RP.z+=(RP.tz-RP.z)*k;
   let da=RP.tyaw-RP.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; RP.yaw+=da*k; RP.ft-=dt; }
@@ -1818,8 +1820,8 @@ function mpHzUpdate(dt){
   else { const e=mpZpEnsure(); fogUpdate(dt,e?e.x:0,e?e.z:0,!!(e&&RP.fog&&RP.alive)); } }
 function mpZombieFlash(){ if(!HL.flash)return; if(!MP.ftg){ MP.ftg=new THREE.Object3D(); scene.add(MP.ftg); } if(HL.flash.parent!==scene){ MP.flashTg0=HL.flash.target; scene.add(HL.flash); scene.add(HL.spill); HL.flash.target=MP.ftg; HL.spill.target=MP.ftg; }
   const on=RP.has&&RP.alive, f=on?RP.fl:0, ex=RP.x, ey=RP.y+RP.h-0.12, ez=RP.z, cp=Math.cos(RP.pitch), dx=-Math.sin(RP.yaw)*cp, dy=Math.sin(RP.pitch), dz=-Math.cos(RP.yaw)*cp;
-  HL.flash.position.set(ex+dx*0.3,ey,ez+dz*0.3); HL.spill.position.copy(HL.flash.position); MP.ftg.position.set(ex+dx*8,ey+dy*8,ez+dz*8); HL.flash.intensity=2.4*f*0.55; HL.spill.intensity=0.2*f*0.55;
-  let gl=0; if(f>0.05){ const vx=P.x-ex, vy=P.y+pEye()-ey, vz=P.z-ez, d=Math.hypot(vx,vy,vz); if(d<12&&d>0.2){ const c=(vx*dx+vy*dy+vz*dz)/d; if(c>Math.cos(0.3)&&losClear(ex,ey,ez,P.x,P.y+pEye(),P.z,null))gl=0.18*f*(1-d/12)*clamp((c-Math.cos(0.3))/(1-Math.cos(0.3))*2,0,1); } }
+  const fgm=flashGeom(RP.rk||0); HL.flash.angle=fgm.ang; HL.flash.distance=fgm.dist; HL.spill.angle=fgm.sAng; HL.spill.distance=fgm.sDist; HL.flash.position.set(ex+dx*0.3,ey,ez+dz*0.3); HL.spill.position.copy(HL.flash.position); MP.ftg.position.set(ex+dx*8,ey+dy*8,ez+dz*8); HL.flash.intensity=2.4*f*0.55; HL.spill.intensity=0.2*f*0.55;
+  let gl=0; if(f>0.05){ const vx=P.x-ex, vy=P.y+pEye()-ey, vz=P.z-ez, d=Math.hypot(vx,vy,vz); if(d<12&&d>0.2){ const c=(vx*dx+vy*dy+vz*dz)/d, cc=Math.cos(fgm.ang*1.2); if(c>cc&&losClear(ex,ey,ez,P.x,P.y+pEye(),P.z,null))gl=0.18*f*(1-d/12)*clamp((c-cc)/(1-cc)*2,0,1); } }
   $('glare').style.opacity=gl.toFixed(3); }
 function mpFlashRestore(){ if(!HL.flash||!MP.flashTg0)return; HL.flash.target=MP.flashTg0; HL.spill.target=MP.flashTg0; HL.flash.position.set(0.2,-0.17,0.05); HL.spill.position.set(0.2,-0.17,0.05); HL.flash.intensity=0; HL.spill.intensity=0;
   if(H.on){ camera.add(HL.flash); camera.add(HL.spill); } else { scene.remove(HL.flash); scene.remove(HL.spill); } MP.flashTg0=null; }
