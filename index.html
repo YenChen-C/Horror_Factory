@@ -167,6 +167,7 @@ table{border-collapse:collapse;font-size:13px;width:100%} td,th{padding:3px 8px;
 #tbItem{width:max(60px,calc(var(--u)*1.05));height:max(48px,calc(var(--u)*.82));border-radius:12px;top:calc(var(--m) + var(--st));right:calc(var(--m) + var(--sr) + max(48px,calc(var(--u)*.82))*2 + 20px);font-size:max(11px,calc(var(--u)*.21));padding:0 4px}
 #tbItem.dim{opacity:.55}
 #game.touch #hzProg{top:calc(50% + 40px)}
+#perf{position:absolute;right:10px;top:10px;z-index:60;pointer-events:none;white-space:pre;font:12px/1.45 ui-monospace,Consolas,monospace;color:#cfe8cf;background:rgba(0,0,0,.66);padding:6px 9px;border-radius:6px;max-width:calc(100% - 20px);overflow:hidden}
 #mpHud{left:50%;top:14px;transform:translateX(-50%);font-size:13px;text-align:center;white-space:nowrap;background:rgba(0,0,0,.5)}
 #mpHud .bad{color:#ff8a80}
 #zHud{right:max(16px, env(safe-area-inset-right, 0px));bottom:16px;width:250px;font-size:13px}
@@ -240,7 +241,7 @@ table{border-collapse:collapse;font-size:13px;width:100%} td,th{padding:3px 8px;
     <div><div class="lbl" style="margin-top:6px">半自動手槍<span class="pconly">・子彈無限</span></div>
     <div class="big"><span id="hzAmmo">8</span> <span style="font-size:15px;color:var(--dim)">/ <span id="hzCap">8</span></span></div></div>
   </div>
-  <div class="hud box" id="mpHud" hidden></div>
+  <div class="hud box" id="mpHud" hidden></div><div id="perf" hidden></div>
   <div class="hud box hz" id="zHud" hidden></div>
   <div class="hud" id="zMarks"></div>
   <div class="hud" id="glare"></div>
@@ -270,6 +271,7 @@ table{border-collapse:collapse;font-size:13px;width:100%} td,th{padding:3px 8px;
       <p id="desc">依 3F layout 圖面建出的無塵室，選一個模式開始。</p>
       <div id="menuMain">
         <div class="ctrlrow"><span class="lbl">操作方式</span><div class="btns" id="ctrlSel"><button data-c="auto" id="ctrlAuto" aria-pressed="false">自動</button><button data-c="pc" aria-pressed="false">電腦</button><button data-c="touch" aria-pressed="false">手機</button></div></div>
+        <div class="ctrlrow" id="perfRow"><span class="lbl">效能監控</span><div class="btns"><button id="perfTgl" aria-pressed="false">顯示監控（F8）</button><button id="perfDl2">下載紀錄</button></div><span class="lbl">背景一直記錄最近 60 分鐘；卡頓時按 F8 看數字，玩完下載紀錄給我</span></div>
         <div class="ctrlrow" id="mpRow"><span class="lbl">遊玩人數</span><div class="btns" id="mpSel"><button data-n="1" class="sel">單人</button><button data-n="2">雙人連線</button></div><span class="lbl" id="mpNote"></span></div>
         <div class="modes" id="modes" role="radiogroup" aria-label="遊玩模式">
           <div class="mode" data-m="defense" role="radio" tabindex="0" aria-checked="false">
@@ -330,7 +332,7 @@ table{border-collapse:collapse;font-size:13px;width:100%} td,th{padding:3px 8px;
           <div>藍圖：暫停選單裡的「藍圖」</div>
         </div>
       </div>
-      <div id="menuPause" hidden><div class="btns"><button class="go" id="resume">繼續</button><button id="restart">重新開始</button><button id="toMain">回主頁</button><button id="pBp" hidden>藍圖</button><button id="pSet" hidden>操作 ⚙</button></div></div>
+      <div id="menuPause" hidden><div class="btns"><button class="go" id="resume">繼續</button><button id="restart">重新開始</button><button id="toMain">回主頁</button><button id="perfDl">下載效能紀錄</button><button id="pBp" hidden>藍圖</button><button id="pSet" hidden>操作 ⚙</button></div></div>
       <div id="menuRoom" hidden>
         <div class="roomf"><label><span class="lbl">房號</span><input id="roomNo" maxlength="20" autocomplete="off" spellcheck="false" placeholder="例如 3F01"></label><label><span class="lbl">密碼</span><input id="roomPw" type="password" maxlength="40" autocomplete="off" placeholder="兩人輸入相同密碼"></label></div>
         <div class="btns"><button class="go" id="roomCreate">建立房間</button><button class="go" id="roomJoin">加入房間</button><button id="roomBack">返回</button></div>
@@ -1052,7 +1054,7 @@ function updMonsters(dt){ let budget=3; const TH=mpTH(), pA=TH.alive, ph=TH.h;
     if(moving&&e.state==='chase'&&d<16){ e.stepT-=dt; if(e.stepT<=0){ e.stepT=e.MT.step; hVoice('step',e.x,0.1,e.z,e.type); } } } }
 
 /* ---- levels ---- */
-function horrorLevel(n){ S.level=n; S.lvState='play'; refreshMachines(); navRebuild(); placeHorrorItems(); flow(P.x,P.z);
+function horrorLevel(n){ pfEv('level',{n}); S.level=n; S.lvState='play'; refreshMachines(); navRebuild(); placeHorrorItems(); flow(P.x,P.z);
   const types=[], sp=n%10===0?'竄行群':n%5===0?'巨大型':null, base=Math.min(30,5+2*n);
   if(sp==='竄行群'){ for(let i=0;i<base;i++)types.push('crawler'); }
   else if(sp==='巨大型'){ const cnt=Math.ceil(base*0.6), gi=Math.min(cnt,Math.max(2,Math.floor(n/5)+1)); for(let i=0;i<cnt;i++)types.push(i<gi?'giant':'normal'); }
@@ -1384,7 +1386,7 @@ function hxOnHit(e){ if(!e||e.dead)return; const m=S.hx.mod, f={slow:0.4};
 function hxUpdate(dt){ const X=S.hx; if(!X)return; if(X.insta>0)X.insta=Math.max(0,X.insta-dt);
   hxOpUpdate(dt); hxCraftUpdate(dt); droneUpdate(dt); agvUpdate(dt); trapUpdate(dt); beaconUpdate(dt); powerUpdate(dt);
   for(const m of machines){ if(m.lampC!=='r'||!hxOpable(m))continue; if(m.fixT>0)m.fixT-=dt; if((X.op&&X.op.m===m)||m.fixT>0)continue; if(m.beepT===undefined)m.beepT=R()*1.1; m.beepT-=dt; if(m.beepT<=0){ m.beepT=1.1; if(Math.hypot(m.lampX-P.x,m.lampZ-P.z)<20)hVoice('mbeep',m.lampX,1.6,m.lampZ,'machine'); } }
-  if((MP.on?MP.rState==='play':S.lvState==='play')&&!X.lastAnn){ let n=0,last=null; for(const e of enemies)if(!e.dead&&e.horror&&!e.zp){ n++; last=e; } if(n===1){ X.lastAnn=true; if(!MP.on||MP.host)last.homing=true; if(!MP.zomb)say('最後一隻怪物正在靠近',3); } } }
+  if((MP.on?MP.rState==='play':S.lvState==='play')&&!X.lastAnn){ let n=0,last=null; for(const e of enemies)if(!e.dead&&e.horror&&!e.zp){ n++; last=e; } if(n===1){ X.lastAnn=true; pfEv('lastMonster',{hud:enemies.filter(e=>!e.dead&&!e.zp).length,list:pfMonList()}); if(!MP.on||MP.host)last.homing=true; if(!MP.zomb)say('最後一隻怪物正在靠近',3); } } }
 function hxHud(){ const X=S.hx; if(!X)return; let ch='';
   if(X.chip)ch+='<span class="chip">改造 '+['','I','II','III'][X.chip]+'</span>'; if(X.dmgParts)ch+='<span class="chip">傷害 +'+X.dmgParts*3+'</span>'; if(X.mod)ch+='<span class="chip">'+MODN[X.mod]+'模組</span>';
   for(const k in X.perks)ch+='<span class="chip">'+PERKN[k]+'</span>'; if(X.insta>0)ch+='<span class="chip hot">一槍斃命 '+Math.ceil(X.insta)+'s</span>';
@@ -1427,7 +1429,7 @@ const LT={local:true}, RT={local:false}, distR=new Int32Array(NC); let flowRT=0,
 const GUEST=()=>MP.on&&!MP.host;
 MP.staticN=ents.length;
 function flowR(x,z){ bfs(nearestFree(cellOf(x,z)),distR); }
-function mpSend(d){ if(MP.tr&&MP.conn&&MP.tr.send)try{ MP.tr.send(d); }catch(e){} }
+function mpSend(d){ if(MP.tr&&MP.conn&&MP.tr.send)try{ MP.tr.send(d); pfNet(d,true); }catch(e){} }
 
 /* ---- enemy / monster targets: the local player or the remote one ---- */
 function mpLT(){ LT.x=P.x; LT.y=P.y; LT.z=P.z; LT.alive=P.alive&&!P.down; LT.h=pHeight(); LT.sc=S.bless.scale; LT.df=dist; return LT; }
@@ -1445,15 +1447,18 @@ function mpTH(){ return MP.zomb?mpRT():mpLT(); }
 /* ---- transport (Trystero; tests inject window.__NETMOCK) ---- */
 function mpTransport(roomId,pw,h){ if(window.__NETMOCK)return window.__NETMOCK.join(roomId,pw,h);
   const t={rooms:[],send:null,closed:false,peerRoom:null,leave(){ t.closed=true; clearTimeout(MP.mqttT); for(const r of t.rooms)try{ r.leave(); }catch(e){} t.rooms.length=0; }};
-  const attach=mod=>{ if(t.closed||t.peerRoom)return; let room; try{ room=mod.joinRoom({appId:MP_APP,password:pw},roomId,{onJoinError:d=>{ if(!t.peerRoom)h.err('join',d); }}); }catch(e){ h.err('join',e); return; }
+  t.stats=()=>{ try{ const r=t.peerRoom; if(!r||!r.getPeers)return; const ps=r.getPeers(), pc=ps&&Object.values(ps)[0]; if(!pc||!pc.getStats)return;
+    pc.getStats().then(rep=>{ let pair=null; rep.forEach(s=>{ if(s.type==='transport'&&s.selectedCandidatePairId)pair=rep.get(s.selectedCandidatePairId); }); if(!pair)rep.forEach(s=>{ if(!pair&&s.type==='candidate-pair'&&s.state==='succeeded'&&(s.nominated||s.selected))pair=s; });
+      if(pair){ const l=rep.get(pair.localCandidateId), rr=rep.get(pair.remoteCandidateId); MP.ice={local:l?l.candidateType:'?',remote:rr?rr.candidateType:'?',proto:l?(l.relayProtocol||l.protocol||''):'',rtt:pair.currentRoundTripTime!=null?Math.round(pair.currentRoundTripTime*1000):null}; } }).catch(()=>{}); }catch(e){} };
+  const attach=(mod,via)=>{ if(t.closed||t.peerRoom)return; let room; try{ room=mod.joinRoom({appId:MP_APP,password:pw},roomId,{onJoinError:d=>{ if(!t.peerRoom)h.err('join',d); }}); }catch(e){ h.err('join',e); return; }
     t.rooms.push(room); const a=room.makeAction('g'); let snd;
     const onMsg=(d,meta)=>{ if(t.peerRoom===room)h.msg(d,meta&&meta.peerId!==undefined?meta.peerId:meta); };
     if(Array.isArray(a)){ snd=a[0]; a[1](onMsg); } else { snd=d=>a.send(d); a.onMessage=onMsg; }
-    const onJ=pid=>{ if(t.closed||(t.peerRoom&&t.peerRoom!==room))return; if(!t.peerRoom){ t.peerRoom=room; t.send=snd; clearTimeout(MP.mqttT); for(const r of t.rooms)if(r!==room)try{ r.leave(); }catch(e){} t.rooms=[room]; } h.join(pid); };
+    const onJ=pid=>{ if(t.closed||(t.peerRoom&&t.peerRoom!==room))return; if(!t.peerRoom){ t.peerRoom=room; t.send=snd; MP.via=via; clearTimeout(MP.mqttT); for(const r of t.rooms)if(r!==room)try{ r.leave(); }catch(e){} t.rooms=[room]; } h.join(pid); };
     const onL=pid=>{ if(t.peerRoom===room)h.leave(pid); };
     if(typeof room.onPeerJoin==='function'&&Array.isArray(a)){ room.onPeerJoin(onJ); room.onPeerLeave(onL); } else { room.onPeerJoin=onJ; room.onPeerLeave=onL; } };
-  import(TRY_URL.nostr).then(attach).catch(e=>h.err('load',e));
-  MP.mqttT=setTimeout(()=>{ if(!t.peerRoom&&!t.closed)import(TRY_URL.mqtt).then(attach).catch(()=>{}); },10000);
+  import(TRY_URL.nostr).then(md=>attach(md,'nostr')).catch(e=>h.err('load',e));
+  MP.mqttT=setTimeout(()=>{ if(!t.peerRoom&&!t.closed)import(TRY_URL.mqtt).then(md=>attach(md,'mqtt')).catch(()=>{}); },10000);
   return t; }
 
 /* ---- home, room and lobby ---- */
@@ -1471,11 +1476,11 @@ function mpConnect(host,no,pw){ mpLeave(true); MP.host=host; MP.mode=selMode; MP
   showMenu('lobby','等待室　房號 '+no,''); mpLobbyRender(); $('lbStatus').textContent=host?'已建立房間，等待另一位玩家加入…':'正在尋找房主…';
   MP.tr=mpTransport('fab3f-'+no,pw,{msg:mpOnMsg,join:mpOnJoin,leave:mpOnLeave,err:mpOnErr});
   clearTimeout(MP.connT); if(!host)MP.connT=setTimeout(()=>{ if(!MP.conn)$('lbStatus').textContent='連不上。可能是網路擋住直連，同一個 Wi-Fi 最穩；也請確認房號、密碼相同，且房主已建立房間。'; },15000); }
-function mpOnErr(kind){ if(MP.conn&&kind!=='load')return; $('lbStatus').textContent=kind==='load'?'無法載入連線程式庫，請確認可以連上網路。':'連不上。密碼可能不同；也可能是網路擋住直連，同一個 Wi-Fi 最穩。'; }
-function mpOnJoin(pid){ if(MP.peer!==null&&pid!==MP.peer)return; MP.peer=pid; MP.conn=true; clearTimeout(MP.connT); mpSend({t:'hello',role:MP.host?'host':'guest',mode:MP.mode,v:MP_VER}); if(MP.host)mpSend({t:'cfg',mode:MP.mode,cfg:MP.cfg}); mpLobbyRender(); }
-function mpOnLeave(pid){ if(pid!==MP.peer)return; MP.conn=false; MP.peer=null; MP.hello=false;
+function mpOnErr(kind){ pfEv('net',{what:'error',kind}); if(MP.conn&&kind!=='load')return; $('lbStatus').textContent=kind==='load'?'無法載入連線程式庫，請確認可以連上網路。':'連不上。密碼可能不同；也可能是網路擋住直連，同一個 Wi-Fi 最穩。'; }
+function mpOnJoin(pid){ if(MP.peer!==null&&pid!==MP.peer)return; pfEv('net',{what:'join',host:MP.host,via:MP.via||null}); MP.peer=pid; MP.conn=true; clearTimeout(MP.connT); mpSend({t:'hello',role:MP.host?'host':'guest',mode:MP.mode,v:MP_VER}); if(MP.host)mpSend({t:'cfg',mode:MP.mode,cfg:MP.cfg}); mpLobbyRender(); }
+function mpOnLeave(pid){ if(pid!==MP.peer)return; pfEv('net',{what:'leave'}); MP.conn=false; MP.peer=null; MP.hello=false;
   if(MP.on){ if(HZ()){ mpEndMatch(null,'對方已離線'); } else { mpDropToSolo(); } } else { $('lbStatus').textContent=MP.host?'對方已離開，等待另一位玩家加入…':'房主已離開房間。'; mpLobbyRender(); } }
-function mpLeave(silent){ clearTimeout(MP.connT); if(MP.tr){ MP.leaving=true; try{ MP.tr.leave(); }catch(e){} } MP.tr=null; MP.conn=false; MP.peer=null; MP.hello=false; MP.on=false; MP.zomb=false; RP.has=false; RP.buf=null; MP.off=undefined; }
+function mpLeave(silent){ clearTimeout(MP.connT); if(MP.tr){ MP.leaving=true; try{ MP.tr.leave(); }catch(e){} } MP.tr=null; MP.conn=false; MP.peer=null; MP.hello=false; MP.on=false; MP.zomb=false; RP.has=false; RP.buf=null; MP.off=undefined; PF.net.lastPs=PF.net.lastSn=0; PF.net.rtt=-1; MP.ice=null; MP.via=null; }
 $('lbLeave').addEventListener('click',()=>{ mpLeave(); showMenu('main','廠區 3F 射擊場',MAIN_DESC); });
 function mpLobbyRender(){ const hz=MP.mode==='horror', c=MP.cfg; $('lbDef').hidden=hz; $('lbHz').hidden=!hz;
   $('lbPlayers').innerHTML='<div class="pl"><b>P1</b>'+(MP.host?'你（房主）':'房主')+'</div><div class="pl'+(MP.conn?'':' off')+'"><b>P2</b>'+(MP.conn?(MP.host?'已加入':'你'):'等待中…')+'</div>';
@@ -1493,7 +1498,8 @@ function mpBegin(mode,role){ MP.on=true; MP.mode=mode; MP.role=mode==='horror'?r
 function mpDropToSolo(){ MP.on=false; MP.zomb=false; RP.has=false; for(const m of MPTH)m.visible=false; if(AV){ scene.remove(AV.g); AV=null; } for(const e of enemies)e.rep=false; $('mpHud').hidden=true; say('隊友已離線，繼續單人遊玩',3); }
 
 /* ---- messages ---- */
-function mpOnMsg(d,pid){ if(!d||typeof d!=='object'||(MP.peer!==null&&pid!==undefined&&pid!==MP.peer))return; const t=d.t;
+function mpOnMsg(d,pid){ if(!d||typeof d!=='object'||(MP.peer!==null&&pid!==undefined&&pid!==MP.peer))return; const t=d.t; pfNet(d,false);
+  if(t==='pi'){ mpSend({t:'po',a:d.a}); return; } if(t==='po'){ PF.net.rtt=Math.round(mpNow()-d.a); return; }
   if(t==='hello'){ if(d.role==='host'&&MP.host){ $('lbStatus').textContent='這個房號已經有人建立了，請改按「加入房間」或換一個房號。'; return; } if(d.role==='guest'&&!MP.host){ $('lbStatus').textContent='房間裡沒有房主，請其中一人改按「建立房間」。'; return; }
     MP.hello=true; mpLobbyRender(); return; }
   if(t==='cfg'){ if(MP.host)return; MP.mode=d.mode; Object.assign(MP.cfg,d.cfg); mpLobbyRender(); return; }
@@ -1532,7 +1538,7 @@ function bufSample(e,out){ const B=e.buf; if(!B||!B.length||MP.off===undefined)r
   while(B.length>2&&B[1].t<=rt)B.shift();
   const a=B[0]; if(B.length===1||rt<=a.t){ out.x=a.x; out.y=a.y; out.z=a.z; out.yaw=a.yaw; return true; }
   const b=B[1]; let f=(rt-a.t)/(b.t-a.t); if(Math.hypot(b.x-a.x,b.z-a.z)>6){ const s=f<1?a:b; out.x=s.x; out.y=s.y; out.z=s.z; out.yaw=s.yaw; return true; }
-  if(f>1)f=1+Math.min(rt-b.t,MP_XMAX)/(b.t-a.t);
+  if(f>1){ PF.net.ext++; f=1+Math.min(rt-b.t,MP_XMAX)/(b.t-a.t); }
   out.x=a.x+(b.x-a.x)*f; out.y=a.y+(b.y-a.y)*f; out.z=a.z+(b.z-a.z)*f; let da=b.yaw-a.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; out.yaw=a.yaw+da*Math.min(f,1); return true; }
 function mpPs(){ const o={t:'ps',ts:Math.round(mpNow()),x:+P.x.toFixed(3),y:+P.y.toFixed(3),z:+P.z.toFixed(3),yw:+P.yaw.toFixed(3),pt:+P.pitch.toFixed(3),cr:P.crouch?1:0,mv:P.moving,wk:+P.walk.toFixed(2),al:P.alive?1:0,dn:P.down?1:0,dd:P.dead?1:0,dt:Math.ceil(P.downT||0),
     h:+pHeight().toFixed(2),sc:S.bless.scale,g:curGun().id,ft:P.flashT>0?1:0,hp:Math.ceil(P.hp)};
@@ -1571,7 +1577,7 @@ function mpRemoteBoom(x,y,z,r,max,full,ent,by){ if(!MP.on||!MP.host||!RP.has||!R
   if(d<r&&losClear(x,y,z,RP.x,py,RP.z,ent))mpSend({t:'hurt',n:full?max:max*(1-d/r),o:{src:'boom'}}); }
 
 /* ---- per-frame ---- */
-function mpUpdate(dt){ mpInterpRP(dt);
+function mpUpdate(dt){ mpInterpRP(dt); MP.pingT=(MP.pingT||0)-dt; if(MP.pingT<=0){ MP.pingT=1; mpSend({t:'pi',a:mpNow()}); if(MP.tr&&MP.tr.stats)MP.tr.stats(); }
   MP.psT-=dt; if(MP.psT<=0){ MP.psT=1/30; mpPs(); }
   if(MP.host){ flowRT-=dt; if(flowRT<=0&&RP.has){ flowRT=0.4; flowR(RP.x,RP.z); } MP.snapT-=dt; if(MP.snapT<=0){ MP.snapT=1/20; if(HZ())mpSnapHz(); else mpSnapDef(); } }
   if(HZ())mpHzUpdate(dt); else mpDefUpdate(dt); }
@@ -1725,10 +1731,10 @@ function mpSnapHz(){ const E=[]; for(const e of enemies){ if(e.zp||!e.horror)con
 function mpSnapHzIn(d){ const seen=new Set(); mpClk(d.ts); const ts=typeof d.ts==='number'?d.ts:mpNow(); MP.rTime=d.rt; MP.rState=d.rs; MP.score=d.sc; MP.round=d.rd; mpApplyDoors(d.dw);
   for(const a of d.e){ seen.add(a[0]); let e=mpFindN(a[0]); if(!e){ if(a[7])continue; const c=nearestFree(cellOf(a[2],a[3])); e=makeMonster(a[1],c<0?0:c,Math.max(1,S.level)); e.nid=a[0]; e.rep=true; e.x=a[2]; e.z=a[3]; e.yaw=a[4]; e.chase=false; }
     e.nx=a[2]; e.nz=a[3]; e.nyaw=a[4]; bufPush(e,ts,a[2],0,a[3],a[4]); e.hp=a[5]; e.max=a[6]; const ch=!!(a[8]&1); if(ch&&!e.chase&&(e.scrT||0)<=0){ hVoice('scream',e.x,e.headY,e.z,e.type); e.scrT=6; } e.chase=ch; e.stunned=!!(a[8]&2);
-    if(a[9]>0&&(e.atk||0)<=0)e.atk=a[9]; if(a[7]&&e.dead<=0){ e.dead=1.2; e.hp=0; hVoice('die',e.x,e.headY,e.z,e.type); if(e.xr)for(const m of e.xr)m.visible=false; if(!MP.zomb){ S.kills++; if(R()<0.06)dropPower(e.x,e.z); } } }
-  for(const e of enemies)if(e.rep&&!seen.has(e.nid)){ if(e.dead>0)e.gone=true; else e.removed=true; } for(let i=enemies.length-1;i>=0;i--)if(enemies[i].removed){ scene.remove(enemies[i].g); enemies.splice(i,1); } }
+    if(a[9]>0&&(e.atk||0)<=0)e.atk=a[9]; if(a[7]&&!e.repDead){ e.repDead=true; e.dead=1.2; e.hp=0; hVoice('die',e.x,e.headY,e.z,e.type); if(e.xr)for(const m of e.xr)m.visible=false; if(!MP.zomb){ S.kills++; if(R()<0.06)dropPower(e.x,e.z); } } }
+  for(const e of enemies)if(e.rep&&!seen.has(e.nid)){ if(e.repDead)e.gone=true; else e.removed=true; } for(let i=enemies.length-1;i>=0;i--)if(enemies[i].removed){ scene.remove(enemies[i].g); enemies.splice(i,1); } }
 function mpRepMon(dt){ for(let i=enemies.length-1;i>=0;i--){ const e=enemies[i]; if(e.zp){ mpZpAnim(e,dt); if(e.dead===-99)enemies.splice(i,1); continue; } if(!e.rep)continue;
-    if(e.dead>0||e.gone){ e.dead-=dt; animDeath(e); if(e.dead<=-3){ scene.remove(e.g); enemies.splice(i,1); } continue; }
+    if(e.repDead||e.gone){ e.dead-=dt; animDeath(e); if(e.dead<=-3){ scene.remove(e.g); enemies.splice(i,1); } continue; }
     const ox=e.x, oz=e.z; if(bufSample(e,MPS)){ e.x=MPS.x; e.z=MPS.z; e.yaw=MPS.yaw; } else { const k=Math.min(1,dt*12); if(Math.hypot(e.nx-e.x,e.nz-e.z)>5){ e.x=e.nx; e.z=e.nz; } e.x+=(e.nx-e.x)*k; e.z+=(e.nz-e.z)*k; let da=e.nyaw-e.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; e.yaw+=da*k; }
     const moving=Math.hypot(e.x-ox,e.z-oz)>dt*0.25; if(e.atk>0){ const prev=e.atk; e.atk-=dt; if(prev>0.15&&e.atk<=0.15)hVoice('swipe',e.x,e.headY,e.z,e.type); if(e.atk<0)e.atk=0; } e.scrT=(e.scrT||0)-dt;
     animMonster(e,dt,moving&&!e.stunned,e.chase); e.g.position.set(e.x,0,e.z); e.g.rotation.y=e.yaw; const d=Math.hypot(e.x-P.x,e.z-P.z);
@@ -1737,20 +1743,22 @@ function mpRepMon(dt){ for(let i=enemies.length-1;i>=0;i--){ const e=enemies[i];
 /* rounds (host) */
 function mpPvpTypes(n){ const base=Math.min(30,5+2*n), types=[], giants=n>=5?Math.floor(n/5):0; for(let i=0;i<giants&&types.length<base;i++)types.push('giant');
   while(types.length<base){ let t='normal'; if(n>=5)t=R()<0.6?'normal':'crawler'; else if(n>=3)t=R()<0.7?'normal':'crawler'; types.push(t); } shuffle(types); return types.slice(0,Math.ceil(base*0.5)); }
-function mpRoundStart(k){ MP.round=k; S.level=k; S.lvState='none'; MP.rState='play'; MP.rTime=MP.cfg.time*60; for(const e of enemies)scene.remove(e.g); enemies.length=0; MP.zpE=null;
-  refreshMachines(); navRebuild(); flow(SPAWN.x,SPAWN.z);
+function mpRoundStart(k){ const died=k===1?'b':(MP.lastDied||''); MP.lastDied=null; MP.round=k; S.level=k; S.lvState='none'; MP.rState='play'; MP.rTime=MP.cfg.time*60; for(const e of enemies)scene.remove(e.g); enemies.length=0; MP.zpE=null;
+  let lc=null; if(k===1)refreshMachines(); else { for(const m of machines){ const r=R(); m.lampC=r<0.7?'g':r<0.92?'y':'r'; } lc=machines.map(m=>m.lampC).join(''); }
+  navRebuild(); const hRe=died==='b'||died==='h', zRe=died==='b'||died==='z', hp0=hRe?SPAWN:(MP.zomb?RP:P); flow(hp0.x,hp0.z);
   const placed=[]; for(const t of mpPvpTypes(k)){ let c=-1; for(let i=0;i<80;i++){ const q=reachableCell(20,400); if(q<0)break; const qx=cellX(q), qz=cellZ(q); if(placed.every(p=>Math.hypot(p[0]-qx,p[1]-qz)>=7)){ c=q; break; } if(i===79)c=q; }
     if(c<0)c=reachableCell(8,400); if(c<0)continue; placed.push([cellX(c),cellZ(c)]); const e=makeMonster(t,c,k); e.max=e.hp=Math.round(e.hp*0.75); e.dk=0.75; e.nid=MP.nid++; }
-  let zs=null; for(let i=0;i<400&&!zs;i++){ const q=reachableCell(25,400); if(q<0)break; const x=cellX(q), z=cellZ(q); if(!losClear(SPAWN.x,1.6,SPAWN.z,x,1.6,z,null))zs=[x,z]; } if(!zs){ const q=reachableCell(25,400); zs=q>=0?[cellX(q),cellZ(q)]:[SPAWN.x+20,SPAWN.z]; }
-  const msg={t:'rstart',k,pres:machines.map(m=>m.present?1:0).join(''),zs,tm:MP.rTime,sc:MP.score}; mpSend(msg); mpRoundApply(msg); }
+  let zs=null; if(zRe){ for(let i=0;i<400&&!zs;i++){ const q=reachableCell(25,400); if(q<0)break; const x=cellX(q), z=cellZ(q); if(!losClear(hp0.x,1.6,hp0.z,x,1.6,z,null))zs=[x,z]; } if(!zs){ const q=reachableCell(25,400); zs=q>=0?[cellX(q),cellZ(q)]:[hp0.x+20,hp0.z]; } }
+  const msg={t:'rstart',k,pres:machines.map(m=>m.present?1:0).join(''),zs,hs:hRe?1:0,lc,tm:MP.rTime,sc:MP.score}; mpSend(msg); mpRoundApply(msg); }
 function mpRoundApply(d){ MP.round=d.k; S.level=d.k; S.lvState='none'; MP.rState='play'; MP.rTime=d.tm; MP.score=d.sc; MP.marks.length=0;
-  if(!MP.host){ mpApplyPresent(d.pres); for(const e of enemies)scene.remove(e.g); enemies.length=0; MP.zpE=null; } navRebuild();
-  if(MP.zomb){ P.x=d.zs[0]; P.z=d.zs[1]; P.y=0; P.vy=0; P.yaw=R()*6.283; P.pitch=0; P.alive=true; Z.chaseSpd=MTYPE.normal.chase*(1+0.02*Math.min(d.k-1,10)); P.hp=zMax(); Z.atk=0; Z.recT=0; Z.stunT=0; Z.slowT=0; Z.freezeT=0; Z.burnT=0; Z.op=null; Z.sees=false; Z.swung=false; Z.fogT=0; }
-  else { P.x=SPAWN.x; P.z=SPAWN.z; P.y=0; P.vy=0; P.yaw=0; P.pitch=0; P.alive=true; P.hp=P.hpMax; P.battery=P.battMax; P.stam=P.stamMax; P.exh=false; FL.ev=0; placeHorrorItems(); hxLevel(); S.hx.lastAnn=false; }
+  if(!MP.host){ mpApplyPresent(d.pres); for(const e of enemies)scene.remove(e.g); enemies.length=0; MP.zpE=null; }
+  if(d.lc){ machines.forEach((m,i)=>{ m.lampC=d.lc[i]; m.serviced=false; m.opProg=0; m.zd=false; m.zProg=0; m.beepT=undefined; m.fixT=0; }); syncLamps(); } navRebuild(); pfEv('round',{k:d.k,hs:d.hs,zs:!!d.zs});
+  if(MP.zomb){ if(d.zs){ P.x=d.zs[0]; P.z=d.zs[1]; P.y=0; P.vy=0; P.yaw=R()*6.283; P.pitch=0; } P.alive=true; Z.chaseSpd=MTYPE.normal.chase*(1+0.02*Math.min(d.k-1,10)); P.hp=zMax(); Z.atk=0; Z.recT=0; Z.stunT=0; Z.slowT=0; Z.freezeT=0; Z.burnT=0; Z.op=null; Z.sees=false; Z.swung=false; Z.fogT=0; }
+  else { if(d.hs){ P.x=SPAWN.x; P.z=SPAWN.z; P.y=0; P.vy=0; P.yaw=0; P.pitch=0; } P.alive=true; P.hp=P.hpMax; P.battery=P.battMax; P.stam=P.stamMax; P.exh=false; FL.ev=0; placeHorrorItems(); hxLevel(); S.hx.lastAnn=false; }
   P.protect=1; if(S.hx)S.hx.lastAnn=false; $('hzLevel').textContent=d.k; say('第 '+d.k+' / '+MP.cfg.rounds+' 局　你是'+(MP.zomb?'殭屍':'人類'),3); note(MP.zomb?'找到人類並擊倒他；F 破壞綠燈機台換殭屍物資':'找出並擊殺殭屍玩家（外觀和其他殭屍一樣）',4); }
-function mpDeath(){ if(MP.rState!=='play')return; const humanDied=!MP.zomb; if(MP.host)mpRoundEnd(humanDied?'z':'h',humanDied?'人類倒下':'殭屍玩家被擊倒'); else mpSend({t:humanDied?'hdead':'zdead'}); say(humanDied?'你倒下了':'你被擊倒了',3); }
-function mpRoundEnd(win,why){ if(MP.rState!=='play')return; MP.rState='rest'; MP.restT=8; MP.score[win==='h'?0:1]++; const last=MP.round>=MP.cfg.rounds; const msg={t:'rend',win,why,sc:MP.score,last}; mpSend(msg); mpRoundEndApply(msg); }
-function mpRoundEndApply(d){ MP.rState='rest'; MP.score=d.sc; MP.restT=8; P.protect=9; Z.op=null; if(S.hx){ S.hx.op=null; S.hx.craft=null; }
+function mpDeath(){ if(MP.rState!=='play')return; const humanDied=!MP.zomb; if(MP.host)mpRoundEnd(humanDied?'z':'h',humanDied?'人類倒下':'殭屍玩家被擊倒',humanDied?'h':'z'); else mpSend({t:humanDied?'hdead':'zdead'}); say(humanDied?'你倒下了':'你被擊倒了',3); }
+function mpRoundEnd(win,why,died){ if(MP.rState!=='play')return; MP.lastDied=died||null; MP.rState='rest'; MP.restT=8; MP.score[win==='h'?0:1]++; const last=MP.round>=MP.cfg.rounds; const msg={t:'rend',win,why,sc:MP.score,last}; mpSend(msg); mpRoundEndApply(msg); }
+function mpRoundEndApply(d){ pfEv('roundEnd',{win:d.win,why:d.why,sc:d.sc}); MP.rState='rest'; MP.score=d.sc; MP.restT=8; P.protect=9; Z.op=null; if(S.hx){ S.hx.op=null; S.hx.craft=null; }
   say((d.win==='h'?'人類獲勝':'殭屍獲勝')+'：'+d.why,4); note(d.last?'比賽結束，8 秒後顯示結果':'人類 '+d.sc[0]+' : '+d.sc[1]+' 殭屍　8 秒後開始第 '+(MP.round+1)+' 局',4); }
 function mpEndMatch(d,why){ const sc=d?d.sc:MP.score; state='over'; firing=false; P.trig=0; unlock(); $('resume').hidden=true; $('restart').hidden=true; $('pBp').hidden=true; $('pSet').hidden=true; $('toMain').textContent='回主頁';
   const res=sc[0]>sc[1]?'人類勝':sc[0]<sc[1]?'殭屍勝':'平手'; showMenu('pause',why?'對戰中斷':'比賽結束',(why?why+'。':'')+'人類 '+sc[0]+' : '+sc[1]+' 殭屍　'+(why?'':res+'。你是'+(MP.zomb?'殭屍':'人類')+'。'));
@@ -1764,7 +1772,7 @@ function mpHzMsg(d){ const t=d.t;
   if(t==='hit'){ if(!MP.host)return; const e=mpFindN(d.id); if(!e||e.dead)return; hurtMonster(e,d.d); mpMonFxApply(e,d.fx); return; }
   if(t==='stunAll'){ if(!MP.host)return; for(const e of enemies)if(e.horror&&!e.zp&&!e.dead){ e.stunT=Math.max(e.stunT||0,3); e.atk=0; } return; }
   if(t==='zhit'){ zHit(d); return; }
-  if(t==='hdead'||t==='zdead'){ if(MP.host)mpRoundEnd(t==='hdead'?'z':'h',t==='hdead'?'人類倒下':'殭屍玩家被擊倒'); return; }
+  if(t==='hdead'||t==='zdead'){ if(MP.host)mpRoundEnd(t==='hdead'?'z':'h',t==='hdead'?'人類倒下':'殭屍玩家被擊倒',t==='hdead'?'h':'z'); return; }
   if(t==='heard'){ zMark(d.x,d.z); return; }
   if(t==='roar'){ if(!MP.zomb)hVoice('scream',d.x,1.8,d.z,RP.giant?'giant':'normal'); if(MP.host)mpRoar(d.x,d.z); return; }
   if(t==='mlamp'){ const m=machines[d.i]; if(!m)return; m.lampC=d.c; m.serviced=!!d.sv; if(d.zd)m.zd=true; syncLamps(); return; }
@@ -1798,6 +1806,70 @@ function mpZombieLook(){ hemi.intensity=0.42; hemi.color.setHex(0x9fd69f); hemi.
 function mpHzBegin(){ zReset(); MP.rState='none'; if(MP.zomb){ mpZombieLook(); FL.val=0; } else $('zHud').hidden=true;
   if(MP.host){ mpSend({t:'lamps',c:machines.map(m=>m.lampC).join('')}); mpRoundStart(1); } }
 function hxFixPulse(m){ hVoice('fixalert',m.lampX,1.6,m.lampZ,'machine'); mpSnd('fixalert',m.lampX,1.6,m.lampZ); hear(m.sx,m.sz,18); }
+
+/* ================= performance monitor (always recording; F8 shows it; log can be downloaded) ================= */
+const BUILD='v9';
+const PF={t0:performance.now(),sec:[],fr:[],ev:[],acc:null,show:false,mPend:0,gpu:null,gq:[],gpuOK:false,lastGpu:null,lastSec:null,secT:0,ovT:0,spikeT:0,
+  lt:{n:0,ms:0},net:{rxN:0,rxB:0,txN:0,txB:0,gapPs:0,gapSn:0,lastPs:0,lastSn:0,rtt:-1,ext:0}};
+function pfNew(){ return {n:0,iv:[],upd:0,plc:0,hud:0,rnd:0,gpu:0,gpuN:0,gpuMax:0,mN:0,mLag:0,mLagN:0,mLagMax:0,calls:0,tris:0,s33:0,s50:0,s100:0}; }
+PF.acc=pfNew();
+function pfT(){ return +((performance.now()-PF.t0)/1000).toFixed(2); }
+function pfEv(type,o){ const e=Object.assign({t:pfT(),type},o||{}); PF.ev.push(e); if(PF.ev.length>3000)PF.ev.shift(); }
+(function pfInit(){
+  try{ const gl=renderer.getContext(); if(renderer.capabilities.isWebGL2){ const x=gl.getExtension('EXT_disjoint_timer_query_webgl2'); if(x){ PF.gpu={gl,x}; PF.gpuOK=true; } } }catch(e){}
+  try{ if(window.PerformanceObserver&&PerformanceObserver.supportedEntryTypes&&PerformanceObserver.supportedEntryTypes.indexOf('longtask')>=0)new PerformanceObserver(l=>{ for(const e of l.getEntries()){ PF.lt.n++; PF.lt.ms+=e.duration; } }).observe({entryTypes:['longtask']}); }catch(e){}
+  addEventListener('error',e=>pfEv('error',{msg:String(e.message||'').slice(0,300),at:String(e.filename||'').slice(-40)+':'+(e.lineno||0)+':'+(e.colno||0)}));
+  addEventListener('unhandledrejection',e=>pfEv('reject',{msg:String(e.reason&&(e.reason.message||e.reason)).slice(0,300)}));
+  document.addEventListener('visibilitychange',()=>pfEv('visibility',{hidden:!!document.hidden}));
+  document.addEventListener('pointerlockchange',()=>pfEv('pointerlock',{locked:!!document.pointerLockElement}));
+  addEventListener('resize',()=>pfEv('resize',{w:innerWidth,h:innerHeight,dpr:window.devicePixelRatio||1}));
+})();
+function pfMouse(e){ const now=performance.now(), ts=e&&e.timeStamp&&e.timeStamp<=now+50?e.timeStamp:now; if(!PF.mPend)PF.mPend=ts; PF.acc.mN++; }
+function pfGpuBegin(){ const G=PF.gpu; if(!G)return null; const gl=G.gl, x=G.x;
+  try{ for(let i=0;i<PF.gq.length;){ const q=PF.gq[i]; if(gl.getQueryParameter(q,gl.QUERY_RESULT_AVAILABLE)){ if(!gl.getParameter(x.GPU_DISJOINT_EXT)){ const ms=gl.getQueryParameter(q,gl.QUERY_RESULT)/1e6, A=PF.acc; A.gpu+=ms; A.gpuN++; if(ms>A.gpuMax)A.gpuMax=ms; PF.lastGpu=ms; } gl.deleteQuery(q); PF.gq.splice(i,1); } else i++; }
+    if(PF.gq.length>=6)return null; const q=gl.createQuery(); gl.beginQuery(x.TIME_ELAPSED_EXT,q); return q; }catch(e){ PF.gpu=null; PF.gpuOK=false; return null; } }
+function pfGpuEnd(q){ if(!q||!PF.gpu)return; try{ PF.gpu.gl.endQuery(PF.gpu.x.TIME_ELAPSED_EXT); PF.gq.push(q); }catch(e){} }
+function pfFrame(now,iv,u,p,h,r){ const A=PF.acc; A.n++; A.iv.push(iv); A.upd+=u; A.plc+=p; A.hud+=h; A.rnd+=r; if(iv>33.4)A.s33++; if(iv>50)A.s50++; if(iv>100)A.s100++;
+  const inf=renderer.info.render; A.calls+=inf.calls; A.tris+=inf.triangles;
+  if(PF.mPend){ const lag=Math.max(0,now-PF.mPend); A.mLag+=lag; A.mLagN++; if(lag>A.mLagMax)A.mLagMax=lag; PF.mPend=0; }
+  PF.fr.push([+iv.toFixed(1),+u.toFixed(2),+p.toFixed(2),+h.toFixed(2),+r.toFixed(2),PF.lastGpu===null?null:+PF.lastGpu.toFixed(2)]); if(PF.fr.length>900)PF.fr.shift();
+  if(iv>120&&state==='play'&&now-PF.spikeT>1000){ PF.spikeT=now; pfEv('spike',{iv:Math.round(iv),upd:+u.toFixed(1),plc:+p.toFixed(1),hud:+h.toFixed(1),rnd:+r.toFixed(1)}); }
+  if(now-PF.secT>=1000)pfSecond(now);
+  if(PF.show&&now-PF.ovT>500){ PF.ovT=now; pfOverlay(); } }
+function pfState(){ if(state!=='play')return state; let s='play:'+S.mode; if(MP.on)s+=(MP.host?':host':':guest')+(MP.zomb?':zombie':(S.mode==='horror'?':human':'')); return s; }
+function pfSecond(now){ const A=PF.acc; PF.secT=now; if(!A.n){ PF.acc=pfNew(); return; }
+  const iv=A.iv.slice().sort((a,b)=>a-b), q=k=>iv[Math.min(iv.length-1,Math.floor(iv.length*k))], N=PF.net;
+  const s={t:Math.round((now-PF.t0)/1000),st:pfState(),fps:A.n,fAvg:+(iv.reduce((a,b)=>a+b,0)/iv.length).toFixed(1),fP50:+q(0.5).toFixed(1),fP95:+q(0.95).toFixed(1),fMax:+iv[iv.length-1].toFixed(1),s33:A.s33,s50:A.s50,s100:A.s100,
+    upd:+(A.upd/A.n).toFixed(2),plc:+(A.plc/A.n).toFixed(2),hud:+(A.hud/A.n).toFixed(2),rnd:+(A.rnd/A.n).toFixed(2),gpu:A.gpuN?+(A.gpu/A.gpuN).toFixed(2):null,gpuMax:A.gpuN?+A.gpuMax.toFixed(1):null,
+    mN:A.mN,mLag:A.mLagN?+(A.mLag/A.mLagN).toFixed(1):null,mLagMax:A.mLagN?+A.mLagMax.toFixed(1):null,calls:Math.round(A.calls/A.n),tris:Math.round(A.tris/A.n),lt:PF.lt.n,ltMs:Math.round(PF.lt.ms),
+    heap:performance.memory?Math.round(performance.memory.usedJSHeapSize/1048576):null,en:enemies.length,hid:document.hidden?1:0,lock:document.pointerLockElement?1:0};
+  if(MP.on||MP.conn){ Object.assign(s,{rtt:N.rtt,rxN:N.rxN,rxKB:+(N.rxB/1024).toFixed(1),txN:N.txN,txKB:+(N.txB/1024).toFixed(1),gapPs:Math.round(N.gapPs),gapSn:Math.round(N.gapSn),ext:N.ext}); if(MP.ice)s.ice=MP.ice.local+'/'+MP.ice.remote+(MP.ice.rtt!=null?':'+MP.ice.rtt:''); }
+  N.rxN=N.rxB=N.txN=N.txB=N.gapPs=N.gapSn=N.ext=0;
+  PF.sec.push(s); if(PF.sec.length>3600)PF.sec.shift(); PF.lt.n=0; PF.lt.ms=0; PF.acc=pfNew(); PF.lastSec=s; }
+function pfOverlay(){ const s=PF.lastSec, el=$('perf'); if(!s){ el.textContent='效能監控：收集中…'; return; }
+  let t='FPS '+s.fps+'　每幀 '+s.fAvg+' ms（95%：'+s.fP95+'，最慢：'+s.fMax+'）\n'
+    +'CPU：更新 '+s.upd+'　擺放 '+s.plc+'　介面 '+s.hud+'　送出繪製 '+s.rnd+' ms\n'
+    +'GPU：'+(s.gpu===null?(PF.gpuOK?'量測中':'瀏覽器不提供'):s.gpu+' ms（最慢 '+s.gpuMax+'）')+'　繪製呼叫 '+s.calls+'　三角形 '+Math.round(s.tris/1000)+'k\n'
+    +'滑鼠到畫面開始：'+(s.mLag===null?'-':s.mLag+' ms（最慢 '+s.mLagMax+'）')+'　超過 50 ms 的幀：'+s.s50;
+  if(s.rtt!==undefined)t+='\n連線延遲 '+(s.rtt<0?'-':s.rtt+' ms')+'　收 '+s.rxKB+' KB/s　送 '+s.txKB+' KB/s　最長間隔 '+Math.max(s.gapPs,s.gapSn)+' ms'+(s.ice?'　路線 '+s.ice:'');
+  el.textContent=t; }
+function pfToggle(v){ PF.show=v===undefined?!PF.show:!!v; $('perf').hidden=!PF.show; $('perfTgl').setAttribute('aria-pressed',PF.show?'true':'false'); $('perfTgl').classList.toggle('sel',PF.show); if(PF.show)pfOverlay(); pfEv('overlay',{on:PF.show}); }
+function pfInfo(){ const gl=renderer.getContext(); let gpu='?',ven='?',aa=null; try{ const d=gl.getExtension('WEBGL_debug_renderer_info'); if(d){ gpu=String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)); ven=String(gl.getParameter(d.UNMASKED_VENDOR_WEBGL)); } else gpu=String(gl.getParameter(gl.RENDERER)); aa=gl.getContextAttributes().antialias; }catch(e){}
+  const sz=new THREE.Vector2(); try{ renderer.getDrawingBufferSize(sz); }catch(e){} let pl=0,sl=0,mesh=0; scene.traverse(o=>{ if(o.isPointLight&&o.visible)pl++; if(o.isSpotLight&&o.visible)sl++; if(o.isMesh||o.isInstancedMesh)mesh++; });
+  return {build:BUILD,at:new Date().toString(),uptimeSec:Math.round((performance.now()-PF.t0)/1000),ua:navigator.userAgent,cores:navigator.hardwareConcurrency||null,memGB:navigator.deviceMemory||null,
+    screen:window.screen?window.screen.width+'x'+window.screen.height:'?',dpr:window.devicePixelRatio||1,window:innerWidth+'x'+innerHeight,drawBuffer:sz.x+'x'+sz.y,pixelRatio:Number(renderer.getPixelRatio()),webgl2:!!renderer.capabilities.isWebGL2,gpu,vendor:ven,gpuTimer:PF.gpuOK,antialias:aa,
+    shadowMap:renderer.shadowMap.enabled,flashShadow:!!(HL.flash&&HL.flash.castShadow),shadowOption:shadowOpt,pointLights:pl,spotLights:sl,meshes:mesh,programs:renderer.info.programs?renderer.info.programs.length:null,textures:renderer.info.memory.textures,geometries:renderer.info.memory.geometries,
+    state:pfState(),ctrl:ctrlPref,mp:(MP.on||MP.conn)?{host:MP.host,mode:MP.mode,role:MP.role,via:MP.via||null,ice:MP.ice||null}:null}; }
+function pfDownload(){ pfSecond(performance.now()); pfEv('download');
+  const data={info:pfInfo(),legend:{seconds:'每秒一筆：fps、每幀毫秒（平均/中位/95%/最慢）、超過33/50/100ms的幀數、CPU 各段平均毫秒（upd更新/plc擺放/hud介面/rnd送出繪製）、gpu 平均與最慢毫秒、mN滑鼠事件數、mLag滑鼠到畫面開始毫秒、calls繪製呼叫、tris三角形、lt長任務、heap記憶體MB、en怪物數；連線時另有 rtt延遲、收送筆數與KB、gapPs/gapSn最長間隔毫秒、ext補位次數、ice連線路線',lastFrames:'最後約 15 秒每幀：[間隔, 更新, 擺放, 介面, 送出繪製, GPU]（毫秒）'},
+    seconds:PF.sec,events:PF.ev,lastFrames:PF.fr};
+  const txt=JSON.stringify(data), d=new Date(), p=n=>String(n).padStart(2,'0');
+  const name='fab3f-log-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds())+((MP.on||MP.conn)?(MP.host?'-host':'-guest'):'')+'.json';
+  try{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },4000); note('已下載效能紀錄 '+name,3); }
+  catch(e){ note('下載失敗：'+e.message,4); } }
+function pfNet(d,out){ const N=PF.net; let b=0; try{ b=JSON.stringify(d).length; }catch(e){} if(out){ N.txN++; N.txB+=b; return; } N.rxN++; N.rxB+=b; const now=performance.now();
+  if(d.t==='ps'){ if(N.lastPs){ const g=now-N.lastPs; if(g>N.gapPs)N.gapPs=g; } N.lastPs=now; } else if(d.t==='snap'){ if(N.lastSn){ const g=now-N.lastSn; if(g>N.gapSn)N.gapSn=g; } N.lastSn=now; } }
+function pfMonList(){ const R0=MP.on&&MP.zomb?RP:P; return enemies.map(e=>({type:e.type,nid:e.nid||null,dead:+(e.dead||0).toFixed(2),zp:!!e.zp,rep:!!e.rep,repDead:!!e.repDead,hp:Math.round(e.hp||0),d:+Math.hypot(e.x-R0.x,e.z-R0.z).toFixed(1),vis:!!(e.g&&e.g.parent)})); }
 
 /* ================= interaction ================= */
 function nearDoor(){ let best=null,bd=2.0; for(const D of doors){ if(D.locked||D.auto||!D.ent.alive)continue; const d=Math.hypot(D.mx-P.x,D.mz-P.z); if(d<bd){bd=d;best=D;} } return best; }
@@ -1852,7 +1924,7 @@ $('blessBody').addEventListener('click',e=>{ const b=e.target.closest&&e.target.
 $('blessSkip').addEventListener('click',()=>chooseBless(-1));
 
 /* ================= input ================= */
-addEventListener('keydown',e=>{ if(state==='bp'){ if(e.code==='KeyB'||e.code==='Escape'){ e.preventDefault(); closeBP(); } return; } if(state!=='play')return; const c=e.code; if(['Space','Tab','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','AltLeft','AltRight'].includes(c)||(e.ctrlKey&&['KeyS','KeyD','KeyA'].includes(c)))e.preventDefault(); if(keys[c])return; keys[c]=true; if(uiOpen){ if(!$('bpMenu').hidden&&(c==='KeyB'||c==='Escape'))closeBP(); else if(c==='KeyB')closeShop(); return; } if(MP.on&&!P.alive&&c!=='KeyM'&&c!=='Escape'&&c!=='KeyE')return; if(HZ()&&HZ_OFF.has(c))return; if(MP.zomb){ if(c==='KeyQ')zRoar(); else if(c==='KeyG')zFog(); else if(c==='KeyE')useDoor(); else if(c==='KeyF')interact(); else if(c==='KeyM'){ const b=$('bigmap'); b.hidden=!b.hidden; if(!b.hidden)drawBig(); } else if(c==='Escape'&&!locked)pause(); return; }
+addEventListener('keydown',e=>{ if(e.code==='F8'){ e.preventDefault(); pfToggle(); return; } if(state==='bp'){ if(e.code==='KeyB'||e.code==='Escape'){ e.preventDefault(); closeBP(); } return; } if(state!=='play')return; const c=e.code; if(['Space','Tab','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','AltLeft','AltRight'].includes(c)||(e.ctrlKey&&['KeyS','KeyD','KeyA'].includes(c)))e.preventDefault(); if(keys[c])return; keys[c]=true; if(uiOpen){ if(!$('bpMenu').hidden&&(c==='KeyB'||c==='Escape'))closeBP(); else if(c==='KeyB')closeShop(); return; } if(MP.on&&!P.alive&&c!=='KeyM'&&c!=='Escape'&&c!=='KeyE')return; if(HZ()&&HZ_OFF.has(c))return; if(MP.zomb){ if(c==='KeyQ')zRoar(); else if(c==='KeyG')zFog(); else if(c==='KeyE')useDoor(); else if(c==='KeyF')interact(); else if(c==='KeyM'){ const b=$('bigmap'); b.hidden=!b.hidden; if(!b.hidden)drawBig(); } else if(c==='Escape'&&!locked)pause(); return; }
   if(HZ()&&(c==='KeyG'||c==='KeyQ'||c==='KeyB')){ if(c==='KeyG')useItem(); else if(c==='KeyQ')switchItem(); else openBP('game'); return; }
   if(c==='KeyT'){ third=!third; $('view').textContent=third?'第三人稱':'第一人稱'; } else if(c==='KeyR')reload(); else if(c==='KeyM'){ const b=$('bigmap'); b.hidden=!b.hidden; if(!b.hidden)drawBig(); }
   else if(c==='Digit1'){ if(P.primary&&P.slot!=='primary'){ P.slot='primary'; P.reload=0; } } else if(c==='Digit2'){ if(P.slot!=='pistol'){ P.slot='pistol'; P.reload=0; } }
@@ -1861,7 +1933,7 @@ addEventListener('keydown',e=>{ if(state==='bp'){ if(e.code==='KeyB'||e.code==='
 addEventListener('keyup',e=>{ keys[e.code]=false; if(e.code==='AltLeft'||e.code==='AltRight')e.preventDefault(); if(e.code==='KeyV'&&P.grap){ P.grap=null; P.grapCd=3; } });
 addEventListener('blur',()=>{ for(const k in keys)keys[k]=false; firing=false; P.aim=false; });
 document.addEventListener('pointerlockchange',()=>{ const was=locked; locked=document.pointerLockElement===cvs; if(locked)everLocked=true; if(was&&!locked&&state==='play'&&!uiOpen)pause(); });
-addEventListener('mousemove',e=>{ if(state!=='play'||uiOpen)return; if(locked||dragLook){ const s=0.0023*(P.aim?0.55:1); P.yaw-=e.movementX*s; P.pitch=clamp(P.pitch-e.movementY*s,-1.45,1.45); } });
+addEventListener('mousemove',e=>{ if(state!=='play'||uiOpen)return; pfMouse(e); if(locked||dragLook){ const s=0.0023*(P.aim?0.55:1); P.yaw-=e.movementX*s; P.pitch=clamp(P.pitch-e.movementY*s,-1.45,1.45); } });
 cvs.addEventListener('mousedown',e=>{ if(state!=='play'||uiOpen)return; if(e.button===0){ if(HZ())P.trig=0.2; else firing=true; } if(e.button===2)P.aim=true; if(!locked){ dragLook=true; lock(); } e.preventDefault(); });
 addEventListener('mouseup',e=>{ if(e.button===0)firing=false; if(e.button===2)P.aim=false; dragLook=false; });
 cvs.addEventListener('contextmenu',e=>e.preventDefault());
@@ -1873,10 +1945,10 @@ function pause(){ if(state!=='play')return; if(MP.on){ if(uiOpen)return; uiOpen=
 function gameOver(){ state='over'; firing=false; P.trig=0; releaseTouch(); syncTouchUI(); $('pSet').hidden=true; $('pBp').hidden=true; $('bpMenu').hidden=true; unlock(); saveXP(); $('resume').hidden=true; $('restart').hidden=!!MP.on; $('toMain').textContent='回主頁'; if(HZ()){ const tt=Math.floor(S.gameTime), done=S.lvState==='rest'?S.level:S.level-1; showMenu('pause','你死了','完成 '+Math.max(0,done)+' 關，擊殺 '+S.kills+' 隻怪物，遊玩時間 '+Math.floor(tt/60)+' 分 '+(tt%60)+' 秒。'); return; } showMenu('pause','防線失守','完成 '+Math.max(0,S.wave-1)+' 波，擊倒 '+S.kills+' 名敵人。'); }
 function restoreWorld(){ for(const e of ents){ if(e.type==='barrel'||e.type==='agv')continue; e.hp=e.max; if(e.type==='machine'){ clearFx(e); e.burn=-1; e.exploded=false; e.present=true; e.obbs.forEach((o,i)=>{o.y1=e.h0[i];}); } e.alive=true; showEnt(e,true); if(e.door){ e.door.open=0; e.door.want=0; e.door.o.off=false; doorPose(e.door); } }
   for(const p of pickups)removePickup(p); pickups.length=0; for(const t of throws){ scene.remove(t.m); if(t.ring)scene.remove(t.ring); } throws.length=0; for(const e of enemies)scene.remove(e.g); enemies.length=0; boomQ.length=0; removeAGV(); hxClear(); mpCleanup(); $('shop').hidden=true; $('bless').hidden=true; uiOpen=false; }
-function begin(mode){ audioInit(); if(AC&&AC.state==='suspended')AC.resume(); exitHorrorLook(); restoreWorld(); newRun(mode); S.touch=mode==='horror'&&isTouchPref(); S.touchAsked=false; TOUCH.crouch=false; if(S.touch)goFullscreen(); navRebuild(); if(GUEST())spawnBarrelsAt([]); else { spawnBarrels(); if(MP.on)mpSend({t:'barrels',list:barrels.map(b=>[+b.x.toFixed(3),+b.z.toFixed(3)])}); } navRebuild(); { const c0=cellOf(P.x,P.z); if(c0<0||navBlock[c0]){ const c=nearestFree(c0); if(c>=0){ P.x=cellX(c); P.z=cellZ(c); } } }
+function begin(mode){ pfEv('start',{mode,mp:!!MP.on,role:MP.role||null}); audioInit(); if(AC&&AC.state==='suspended')AC.resume(); exitHorrorLook(); restoreWorld(); newRun(mode); S.touch=mode==='horror'&&isTouchPref(); S.touchAsked=false; TOUCH.crouch=false; if(S.touch)goFullscreen(); navRebuild(); if(GUEST())spawnBarrelsAt([]); else { spawnBarrels(); if(MP.on)mpSend({t:'barrels',list:barrels.map(b=>[+b.x.toFixed(3),+b.z.toFixed(3)])}); } navRebuild(); { const c0=cellOf(P.x,P.z); if(c0<0||navBlock[c0]){ const c=nearestFree(c0); if(c>=0){ P.x=cellX(c); P.z=cellZ(c); } } }
   $('modeLbl').textContent=mode==='practice'?'射擊練習場':mode==='horror'?'恐怖模式':'波次・'+DIFF[S.diff].n; state='play'; $('menu').hidden=true; lock(); last=performance.now(); layoutTouch(); releaseTouch();
   if(mode==='defense'){ if(GUEST()){ S.wave=0; S.phase='buy'; S.timer=20; } else startBuy(); } else if(mode==='horror'){ P.pistol={id:'HG',ammo:magCap('HG')}; P.slot='pistol'; enterHorrorLook(); hxApplyFlash(); if(MP.on)mpHzBegin(); else horrorLevel(1); syncTouchUI(); checkOrient(); } else { refreshMachines(); navRebuild(); S.wave=1; S.phase='fight'; for(let i=0;i<5;i++){ const c=randomCell(P.x,P.z,6,30); if(c>=0)makeEnemy('patrol',c); } let k=0; for(const id of['AR','SM','SG','SR']){ dropGun(P.x-1.2+k*0.8,P.z-0.9,id,GUNS[id].mag,1e9); k++; } $('wave').textContent='—'; say('射擊練習場：F 撿槍，Esc 可離開',3); } }
-function toMain(){ if(MP.tr||MP.on)mpLeave(); state='menu'; exitHorrorLook(); restoreWorld(); for(const b of barrels){ b.alive=false; b.o.off=true; scene.remove(b.mesh); } barrels.length=0; newRun('menu'); navDirty=true; showMenu('main','廠區 3F 射擊場',MAIN_DESC); syncTouchUI(); $('rotate').hidden=true; refreshHome(); }
+function toMain(){ pfEv('main'); if(MP.tr||MP.on)mpLeave(); state='menu'; exitHorrorLook(); restoreWorld(); for(const b of barrels){ b.alive=false; b.o.off=true; scene.remove(b.mesh); } barrels.length=0; newRun('menu'); navDirty=true; showMenu('main','廠區 3F 射擊場',MAIN_DESC); syncTouchUI(); $('rotate').hidden=true; refreshHome(); }
 $('diffs').addEventListener('click',e=>{ const b=e.target.closest&&e.target.closest('button'); if(!b)return; S.diff=+b.dataset.d; for(const x of $('diffs').children)x.classList.toggle('sel',x===b); });
 let selMode=lsGet('fab3f_mode','defense'); if(!['defense','horror','practice'].includes(selMode))selMode='defense';
 const GO_LABEL={defense:'開始防線',horror:'進入恐怖模式',practice:'進入練習場'}, KEY_TITLE={defense:'防線模式操作',horror:'恐怖模式操作',practice:'練習場操作'};
@@ -1884,10 +1956,11 @@ function selectMode(m,noSave){ if(isTouchPref()&&m!=='horror')return; selMode=m;
   $('go').textContent=GO_LABEL[m]; $('go').classList.toggle('hzgo',m==='horror'); $('keysDefense').hidden=m!=='defense'; $('keysHorror').hidden=m!=='horror'||isTouchPref(); $('keysTouch').hidden=!(m==='horror'&&isTouchPref()); $('keysPractice').hidden=m!=='practice'; $('keysTitle').textContent=KEY_TITLE[m]+(m==='horror'&&isTouchPref()?'（手機）':''); mpHomeSync(); }
 $('modes').addEventListener('click',e=>{ const c=e.target.closest&&e.target.closest('.mode'); if(c)selectMode(c.dataset.m); });
 $('modes').addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('mode')){ e.preventDefault(); selectMode(e.target.dataset.m); } });
-$('optShadow').checked=shadowOpt; $('optShadow').addEventListener('change',()=>{ shadowOpt=!!$('optShadow').checked; lsSet('fab3f_shadow',shadowOpt?'1':'0'); });
+$('optShadow').checked=shadowOpt; $('optShadow').addEventListener('change',()=>{ shadowOpt=!!$('optShadow').checked; pfEv('opt',{shadow:shadowOpt}); lsSet('fab3f_shadow',shadowOpt?'1':'0'); });
 $('go').addEventListener('click',()=>{ if(MP.want2&&selMode!=='practice'&&!isTouchPref()){ mpOpenRoom(); return; } begin(selMode); }); refreshHome();
 $('resume').addEventListener('click',()=>{ if(MP.on&&state==='play'){ uiOpen=false; $('menu').hidden=true; lock(); return; } state='play'; $('menu').hidden=true; lock(); last=performance.now(); syncTouchUI(); checkOrient(); });
 $('restart').addEventListener('click',()=>begin(S.mode)); $('toMain').addEventListener('click',toMain);
+$('perfTgl').addEventListener('click',()=>pfToggle()); $('perfDl').addEventListener('click',pfDownload); $('perfDl2').addEventListener('click',pfDownload);
 function xpTable(){ let h='<tr><th>槍種</th><th>等級</th><th>經驗</th><th>下一級</th></tr>'; for(const id of ['P9','AR','SM','SG','SR']){ const lv=gunLv(id); h+='<tr><td>'+GUNS[id].n+'</td><td>Lv.'+lv+'</td><td>'+Math.floor(XP[id])+'</td><td>'+(lv>=10?'—':80*lv*lv)+'</td></tr>'; } $('xpTable').innerHTML=h; $('xpText').value=JSON.stringify(XP); }
 $('showXp').addEventListener('click',()=>{ xpTable(); $('xpMsg').textContent=''; showMenu('xp','武器進度','各槍經驗存在這個瀏覽器，跨局保留。'); });
 $('xpBack').addEventListener('click',()=>showMenu('main','廠區 3F 射擊場',MAIN_DESC));
@@ -1974,10 +2047,10 @@ function hud(dt){ hudT-=dt; if(hudT>0)return; hudT=0.1; if(HZ()){ hudHorror(); r
 function resize(){ const w=host.clientWidth||innerWidth, h=host.clientHeight||innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
 addEventListener('resize',resize); resize();
 let last=performance.now(), menuA=0;
-function loop(now){ requestAnimationFrame(loop); const dt=Math.min(0.05,(now-last)/1000); last=now;
-  if(state==='play'){ update(dt); place(); hud(dt); }
+function loop(now){ requestAnimationFrame(loop); const iv=now-last, dt=Math.min(0.05,iv/1000); last=now; const t0=performance.now(); let t1=t0,t2=t0,t3=t0;
+  if(state==='play'){ update(dt); t1=performance.now(); place(); t2=performance.now(); hud(dt); t3=performance.now(); }
   else if(state==='menu'){ menuA+=dt*0.12; body.visible=false; vm.visible=false; camera.position.set(-6+Math.sin(menuA)*10,2.6,-3+Math.cos(menuA)*6); camera.rotation.set(-0.12,menuA+Math.PI/2,0); }
-  renderer.render(scene,camera); }
+  const gq=pfGpuBegin(); renderer.render(scene,camera); pfGpuEnd(gq); pfFrame(now,iv,t1-t0,t2-t1,t3-t2,performance.now()-t3); }
 navRebuild(); for(const D of doors)doorPose(D);
 $('view').textContent='第三人稱'; showMenu('main');
 requestAnimationFrame(loop);
